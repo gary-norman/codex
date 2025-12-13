@@ -83,7 +83,7 @@ func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
 			view.RenderErrorPage(w, models.NotFoundLocation("user"), 500, models.FetchError("channel info", "GetThisUser", err))
 		}
 
-		models.UpdateTimeSince(&userPosts[p])
+		models.UpdateTimeSince(userPosts[p])
 	}
 
 	// Fetch thisUser post comments
@@ -100,7 +100,7 @@ func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
 		log.Printf(ErrorMsgs.Query, "channels.All-user", err)
 	}
 	for c := range allChannels {
-		models.UpdateTimeSince(&allChannels[c])
+		models.UpdateTimeSince(allChannels[c])
 	}
 
 	for p := range userPosts {
@@ -111,9 +111,9 @@ func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ownedChannels := make([]models.Channel, 0)
-	joinedChannels := make([]models.Channel, 0)
-	ownedAndJoinedChannels := make([]models.Channel, 0)
+	ownedChannels := make([]*models.Channel, 0)
+	joinedChannels := make([]*models.Channel, 0)
+	ownedAndJoinedChannels := make([]*models.Channel, 0)
 	channelMap := make(map[int64]bool)
 	// var userPosts []models.Post
 
@@ -165,7 +165,7 @@ func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
 		UserID:      models.NewUUIDField(), // Default value of 0 for logged out users
 		CurrentUser: currentUser,
 		Instance:    "user-page",
-		ThisUser:    thisUser,
+		ThisUser:    &thisUser,
 		ImagePaths:  u.App.Paths,
 		// ---------- userPosts ----------
 		Posts: userPosts,

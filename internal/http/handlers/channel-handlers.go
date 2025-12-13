@@ -36,16 +36,16 @@ func (c *ChannelHandler) GetChannelPage(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error": "Error getting all channels"}`, http.StatusInternalServerError)
 	}
 	for c := range allChannels {
-		models.UpdateTimeSince(&allChannels[c])
+		models.UpdateTimeSince(allChannels[c])
 	}
 	// get owner name and timesince
 	// get owned channels
 	// get joined channels
 	// innerjoin these 2
 
-	ownedChannels := make([]models.Channel, 0)
-	joinedChannels := make([]models.Channel, 0)
-	ownedAndJoinedChannels := make([]models.Channel, 0)
+	ownedChannels := make([]*models.Channel, 0)
+	joinedChannels := make([]*models.Channel, 0)
+	ownedAndJoinedChannels := make([]*models.Channel, 0)
 
 	if userLoggedIn {
 		// get owned and joined channels of current user
@@ -107,7 +107,7 @@ func (c *ChannelHandler) GetThisChannel(w http.ResponseWriter, r *http.Request) 
 	}
 	thisChannel := foundChannels[0]
 	fmt.Printf(ErrorMsgs.KeyValuePair, "Fetching channel", thisChannel.Name)
-	models.UpdateTimeSince(&thisChannel)
+	models.UpdateTimeSince(thisChannel)
 
 	// Fetch the channel owner
 	thisChannelOwnerName, ownerErr := c.App.Users.GetSingleUserValue(thisChannel.OwnerID, "ID", "username")
@@ -124,7 +124,7 @@ func (c *ChannelHandler) GetThisChannel(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Fetch channel posts
-	var thisChannelPosts []models.Post
+	var thisChannelPosts []*models.Post
 	thisChannelPostIDs, err := c.App.Channels.GetPostIDsFromChannel(thisChannel.ID)
 	if err != nil {
 		http.Error(w, `{"error": "Error getting Post IDs"}`, http.StatusInternalServerError)
@@ -134,7 +134,7 @@ func (c *ChannelHandler) GetThisChannel(w http.ResponseWriter, r *http.Request) 
 		if err != nil {
 			http.Error(w, `{"error": "Error getting post ID:" + thisChannelPostIDs[p]}`, http.StatusInternalServerError)
 		}
-		thisChannelPosts = append(thisChannelPosts, post)
+		thisChannelPosts = append(thisChannelPosts, &post)
 	}
 
 	allChannels, err := c.App.Channels.All()
@@ -142,7 +142,7 @@ func (c *ChannelHandler) GetThisChannel(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error": "Error getting all channels"}`, http.StatusInternalServerError)
 	}
 	for c := range allChannels {
-		models.UpdateTimeSince(&allChannels[c])
+		models.UpdateTimeSince(allChannels[c])
 	}
 	channelName, err := c.App.Channels.GetChannelNameFromID(thisChannel.ID)
 	if err != nil {
@@ -153,7 +153,7 @@ func (c *ChannelHandler) GetThisChannel(w http.ResponseWriter, r *http.Request) 
 	for p := range thisChannelPosts {
 		thisChannelPosts[p].ChannelID, thisChannelPosts[p].ChannelName = thisChannel.ID, channelName
 		// TODO no need for this
-		models.UpdateTimeSince(&thisChannelPosts[p])
+		models.UpdateTimeSince(thisChannelPosts[p])
 	}
 
 	// Retrieve total likes and dislikes for each Channel post
@@ -171,9 +171,9 @@ func (c *ChannelHandler) GetThisChannel(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error": "Error getting comments" }`, http.StatusInternalServerError)
 	}
 
-	ownedChannels := make([]models.Channel, 0)
-	joinedChannels := make([]models.Channel, 0)
-	ownedAndJoinedChannels := make([]models.Channel, 0)
+	ownedChannels := make([]*models.Channel, 0)
+	joinedChannels := make([]*models.Channel, 0)
+	ownedAndJoinedChannels := make([]*models.Channel, 0)
 	isJoined := false
 	isOwned := false
 
@@ -336,10 +336,10 @@ func (c *ChannelHandler) StoreMembership(w http.ResponseWriter, r *http.Request)
 // TODO this function is a mess
 
 // JoinedByCurrentUser checks if the currently logged-in user is a member of the current channel
-func (c *ChannelHandler) JoinedByCurrentUser(memberships []models.Membership) ([]models.Channel, error) {
+func (c *ChannelHandler) JoinedByCurrentUser(memberships []models.Membership) ([]*models.Channel, error) {
 	fmt.Println(Colors.Peach + "Checking if this user is a member of this channel" + Colors.Reset)
 	fmt.Println(ErrorMsgs.Divider)
-	var channels []models.Channel
+	var channels []*models.Channel
 	for _, membership := range memberships {
 		channel, err := c.App.Channels.GetChannelsByID(membership.ChannelID)
 		if err != nil {

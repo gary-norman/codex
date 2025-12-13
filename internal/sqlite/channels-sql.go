@@ -24,7 +24,7 @@ func (m *ChannelModel) Insert(ownerID models.UUIDField, name, description, avata
 	return err
 }
 
-func (m *ChannelModel) OwnedOrJoinedByCurrentUser(ID models.UUIDField) ([]models.Channel, error) {
+func (m *ChannelModel) OwnedOrJoinedByCurrentUser(ID models.UUIDField) ([]*models.Channel, error) {
 	stmt := `
 	SELECT c.*,
 	COUNT(m.UserID) AS MemberCount
@@ -44,7 +44,7 @@ func (m *ChannelModel) OwnedOrJoinedByCurrentUser(ID models.UUIDField) ([]models
 	defer rows.Close()
 
 	// Parse results
-	channels := make([]models.Channel, 0) // Pre-allocate slice
+	channels := make([]*models.Channel, 0) // Pre-allocate slice
 	for rows.Next() {
 		c, err := parseChannelRows(rows)
 		if err != nil {
@@ -55,7 +55,7 @@ func (m *ChannelModel) OwnedOrJoinedByCurrentUser(ID models.UUIDField) ([]models
 		// TODO (realtime) get this data from websockets
 		rnd := RandomInt(1800)
 		c.MembersOnline = rnd
-		channels = append(channels, *c)
+		channels = append(channels, c)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -80,7 +80,7 @@ func (m *ChannelModel) IsUserMemberOfChannel(userID models.UUIDField, channelID 
 	return exists == 1, nil
 }
 
-func (m *ChannelModel) GetChannelsByID(id int64) ([]models.Channel, error) {
+func (m *ChannelModel) GetChannelsByID(id int64) ([]*models.Channel, error) {
 	stmt := `
 	SELECT c.*, 
   COUNT(m.UserID) AS MemberCount
@@ -96,7 +96,7 @@ func (m *ChannelModel) GetChannelsByID(id int64) ([]models.Channel, error) {
 	defer rows.Close()
 
 	// Parse results
-	channels := make([]models.Channel, 0) // Pre-allocate slice
+	channels := make([]*models.Channel, 0) // Pre-allocate slice
 	for rows.Next() {
 		c, err := parseChannelRows(rows)
 		if err != nil {
@@ -105,7 +105,7 @@ func (m *ChannelModel) GetChannelsByID(id int64) ([]models.Channel, error) {
 		// TODO (realtime) get this data from websockets
 		rnd := RandomInt(1800)
 		c.MembersOnline = rnd
-		channels = append(channels, *c)
+		channels = append(channels, c)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -131,7 +131,7 @@ func (m *ChannelModel) GetChannelByID(id int64) (*models.Channel, error) {
 	defer rows.Close()
 
 	var channel models.Channel            // Pre-allocate slice
-	channels := make([]models.Channel, 0) // Pre-allocate slice
+	channels := make([]*models.Channel, 0) // Pre-allocate slice
 	for rows.Next() {
 		c, err := parseChannelRows(rows)
 		if err != nil {
@@ -140,12 +140,12 @@ func (m *ChannelModel) GetChannelByID(id int64) (*models.Channel, error) {
 		// TODO (realtime) get this data from websockets
 		rnd := RandomInt(1800)
 		c.MembersOnline = rnd
-		channels = append(channels, *c)
+		channels = append(channels, c)
 	}
 	if len(channels) == 0 {
 		return &channel, fmt.Errorf("no channel found for ID %d", id)
 	}
-	return &channels[0], nil
+	return channels[0], nil
 }
 
 func (m *ChannelModel) GetNameOfChannel(channelID int64) (string, error) {
@@ -182,10 +182,10 @@ func (m *ChannelModel) GetNameOfChannelOwner(channelID int64) (string, error) {
 	return username, nil
 }
 
-func (m *ChannelModel) All() ([]models.Channel, error) {
+func (m *ChannelModel) All() ([]*models.Channel, error) {
 	stmt := `
--- 	SELECT c.*, 
-SELECT c.ID, c.OwnerID, c.Name, c.Avatar, c.Banner, c.Description, c.Created, c.Updated, c.Privacy, c.IsMuted,  c.IsFlagged, 
+-- 	SELECT c.*,
+SELECT c.ID, c.OwnerID, c.Name, c.Avatar, c.Banner, c.Description, c.Created, c.Updated, c.Privacy, c.IsMuted,  c.IsFlagged,
   COUNT(m.UserID) AS MemberCount
 	FROM Channels c
 	LEFT JOIN Memberships m ON c.ID = m.ChannelID
@@ -202,7 +202,7 @@ SELECT c.ID, c.OwnerID, c.Name, c.Avatar, c.Banner, c.Description, c.Created, c.
 		}
 	}()
 
-	channels := make([]models.Channel, 0) // Pre-allocate slice
+	channels := make([]*models.Channel, 0) // Pre-allocate slice
 	for rows.Next() {
 		c, err := parseChannelRows(rows)
 		if err != nil {
@@ -211,7 +211,7 @@ SELECT c.ID, c.OwnerID, c.Name, c.Avatar, c.Banner, c.Description, c.Created, c.
 		// TODO (realtime) get this data freom websockets
 		rnd := RandomInt(1800)
 		c.MembersOnline = rnd
-		channels = append(channels, *c)
+		channels = append(channels, c)
 	}
 	// fmt.Printf(ErrorMsgs.KeyValuePair, "Total channels", len(Channels))
 	return channels, nil

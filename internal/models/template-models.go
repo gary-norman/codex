@@ -12,23 +12,23 @@ type TemplateData struct {
 	UserID      UUIDField
 	AllUsers    []*User
 	CurrentUser *User
-	ThisUser    User
+	ThisUser    *User
 	RandomUser  *User
 	// ---------- posts ----------
-	Posts     []Post
-	UserPosts []Post
+	Posts     []*Post
+	UserPosts []*Post
 	// ---------- channels ----------
 	// Channels               []Channel
-	AllChannels []Channel
-	ThisChannel Channel
+	AllChannels []*Channel
+	ThisChannel *Channel
 	// ThisChannelOwnerName   string
 	// IsJoinedOrOwned        bool
 	// ThisChannelIsOwned     bool
 	ThisChannelRules []Rule
 	// ThisChannelPosts       []Post
-	OwnedChannels          []Channel
-	JoinedChannels         []Channel
-	OwnedAndJoinedChannels []Channel
+	OwnedChannels          []*Channel
+	JoinedChannels         []*Channel
+	OwnedAndJoinedChannels []*Channel
 	// ---------- chat ----------
 	Chats []Chat
 	// ---------- misc ----------

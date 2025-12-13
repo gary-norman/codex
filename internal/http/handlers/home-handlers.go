@@ -111,7 +111,7 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for p := range allPosts {
-		models.UpdateTimeSince(&allPosts[p])
+		models.UpdateTimeSince(allPosts[p])
 	}
 	allPosts, err = h.Comment.GetPostsComments(allPosts)
 	if err != nil {
@@ -137,7 +137,7 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 		log.Printf(ErrorMsgs.Query, "channels.All-index", err)
 	}
 	for c := range allChannels {
-		models.UpdateTimeSince(&allChannels[c])
+		models.UpdateTimeSince(allChannels[c])
 	}
 
 	for p := range allPosts {
@@ -148,9 +148,9 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ownedChannels := make([]models.Channel, 0)
-	joinedChannels := make([]models.Channel, 0)
-	ownedAndJoinedChannels := make([]models.Channel, 0)
+	ownedChannels := make([]*models.Channel, 0)
+	joinedChannels := make([]*models.Channel, 0)
+	ownedAndJoinedChannels := make([]*models.Channel, 0)
 	channelMap := make(map[int64]bool)
 
 	if userLoggedIn {
@@ -317,7 +317,7 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	start := time.Now()
-	var userPosts []models.Post
+	var userPosts []*models.Post
 	userLoggedIn := true
 	userID := models.ZeroUUIDField()
 
@@ -366,7 +366,7 @@ func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for p := range allPosts {
-		models.UpdateTimeSince(&allPosts[p])
+		models.UpdateTimeSince(allPosts[p])
 	}
 	allPosts, err = h.Comment.GetPostsComments(allPosts)
 	if err != nil {
@@ -392,7 +392,7 @@ func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 		log.Printf(ErrorMsgs.Query, "channels.All-home", err)
 	}
 	for c := range allChannels {
-		models.UpdateTimeSince(&allChannels[c])
+		models.UpdateTimeSince(allChannels[c])
 	}
 
 	for p := range allPosts {
@@ -403,9 +403,9 @@ func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ownedChannels := make([]models.Channel, 0)
-	joinedChannels := make([]models.Channel, 0)
-	ownedAndJoinedChannels := make([]models.Channel, 0)
+	ownedChannels := make([]*models.Channel, 0)
+	joinedChannels := make([]*models.Channel, 0)
+	ownedAndJoinedChannels := make([]*models.Channel, 0)
 	channelMap := make(map[int64]bool)
 
 	if userLoggedIn {

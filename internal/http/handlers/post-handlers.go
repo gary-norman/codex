@@ -21,7 +21,7 @@ type PostHandler struct {
 }
 
 // GetUserPosts returns a slice of Posts that belong to channels the user follows. If no user is logged in, it returns all posts
-func (p *PostHandler) GetUserPosts(user *models.User, allPosts []models.Post) []models.Post {
+func (p *PostHandler) GetUserPosts(user *models.User, allPosts []*models.Post) []*models.Post {
 	if user == nil {
 		return allPosts
 	}
@@ -43,7 +43,7 @@ func (p *PostHandler) GetUserPosts(user *models.User, allPosts []models.Post) []
 	}
 
 	// Combine owned and joined channels
-	allChannels := make([]models.Channel, 0, len(ownedChannels)+len(joinedChannels))
+	allChannels := make([]*models.Channel, 0, len(ownedChannels)+len(joinedChannels))
 	allChannels = append(allChannels, ownedChannels...)
 	allChannels = append(allChannels, joinedChannels...)
 
@@ -58,7 +58,7 @@ func (p *PostHandler) GetUserPosts(user *models.User, allPosts []models.Post) []
 	}
 
 	// Filter posts belonging to user's channels
-	postsInUserChannels := make([]models.Post, 0, len(allPosts))
+	postsInUserChannels := make([]*models.Post, 0, len(allPosts))
 	for _, post := range allPosts {
 		if _, exists := channelIDSet[post.ChannelID]; exists {
 			postsInUserChannels = append(postsInUserChannels, post)
@@ -70,8 +70,8 @@ func (p *PostHandler) GetUserPosts(user *models.User, allPosts []models.Post) []
 
 func (p *PostHandler) GetThisPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	var thisPost models.Post
-	var posts []models.Post
+	var thisPost *models.Post
+	var posts []*models.Post
 	isMember := false
 	var isMemberErr error
 	isOwner := false
@@ -96,7 +96,7 @@ func (p *PostHandler) GetThisPost(w http.ResponseWriter, r *http.Request) {
 		view.RenderErrorPage(w, models.NotFoundLocation("post"), 400, models.NotFoundError(postID, "GetThisPost", err))
 		return
 	}
-	posts = append(posts, post)
+	posts = append(posts, &post)
 	foundPosts, err := p.Comment.GetPostsComments(posts)
 	if err != nil {
 		view.RenderErrorPage(w, models.NotFoundLocation("post"), 500, models.FetchError("post comments", "GetThisPost", err))
@@ -109,7 +109,7 @@ func (p *PostHandler) GetThisPost(w http.ResponseWriter, r *http.Request) {
 		view.RenderErrorPage(w, models.NotFoundLocation("post"), 500, models.FetchError("channel info", "GetThisPost", err))
 	}
 
-	models.UpdateTimeSince(&thisPost)
+	models.UpdateTimeSince(thisPost)
 
 	// Fetch the channel
 	channel, err := p.App.Channels.GetChannelByID(thisPost.ChannelID)

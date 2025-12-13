@@ -13,8 +13,8 @@ import (
 // SearchResult holds aggregated search results from multiple sources
 type SearchResult struct {
 	Users    []*models.User
-	Posts    []models.Post
-	Channels []models.Channel
+	Posts    []*models.Post
+	Channels []*models.Channel
 	Errors   []error // Collect errors from goroutines
 	Duration time.Duration
 }
@@ -36,8 +36,8 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 
 	// Create result channels for each search type
 	usersCh := make(chan []*models.User, 1)
-	postsCh := make(chan []models.Post, 1)
-	channelsCh := make(chan []models.Channel, 1)
+	postsCh := make(chan []*models.Post, 1)
+	channelsCh := make(chan []*models.Channel, 1)
 	errorsCh := make(chan searchError, 3) // Buffer for 3 possible errors
 
 	// WaitGroup to track goroutine completion
@@ -119,8 +119,8 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 	// Collect results
 	result := &SearchResult{
 		Users:    make([]*models.User, 0),
-		Posts:    make([]models.Post, 0),
-		Channels: make([]models.Channel, 0),
+		Posts:    make([]*models.Post, 0),
+		Channels: make([]*models.Channel, 0),
 		Errors:   make([]error, 0),
 	}
 
@@ -153,9 +153,9 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 
 // enrichPostsWithChannels adds channel information to posts
 // This should run AFTER concurrent search completes
-func enrichPostsWithChannels(app *app.App, posts []models.Post, channels []models.Channel) []models.Post {
+func enrichPostsWithChannels(app *app.App, posts []*models.Post, channels []*models.Channel) []*models.Post {
 	// Create channel lookup map for O(1) access instead of O(n²) nested loops
-	channelMap := make(map[int64]models.Channel)
+	channelMap := make(map[int64]*models.Channel)
 	for _, ch := range channels {
 		channelMap[ch.ID] = ch
 	}

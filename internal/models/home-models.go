@@ -5,11 +5,11 @@ type HomePage struct {
 	CurrentUser            *User
 	Instance               string
 	Location               string
-	UserPosts              []Post
-	AllPosts               []Post
-	OwnedChannels          []Channel
-	JoinedChannels         []Channel
-	OwnedAndJoinedChannels []Channel
+	UserPosts              []*Post
+	AllPosts               []*Post
+	OwnedChannels          []*Channel
+	JoinedChannels         []*Channel
+	OwnedAndJoinedChannels []*Channel
 	ImagePaths
 }
 

@@ -38,15 +38,15 @@ type ChannelPage struct {
 	CurrentUser            *User
 	Instance               string
 	Location               string
-	ThisChannel            Channel
+	ThisChannel            *Channel
 	OwnerName              string
 	IsOwned                bool
 	IsJoined               bool
 	Rules                  []Rule
-	Posts                  []Post
-	OwnedChannels          []Channel
-	JoinedChannels         []Channel
-	OwnedAndJoinedChannels []Channel
+	Posts                  []*Post
+	OwnedChannels          []*Channel
+	JoinedChannels         []*Channel
+	OwnedAndJoinedChannels []*Channel
 	ImagePaths
 }
 

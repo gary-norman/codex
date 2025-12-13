@@ -44,7 +44,7 @@ type PostPage struct {
 	CurrentUser *User
 	Instance    string
 	Location    string
-	ThisPost    Post
+	ThisPost    *Post
 	Author      *User
 	ThisChannel *Channel
 	IsOwned     bool

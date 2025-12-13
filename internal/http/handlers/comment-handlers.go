@@ -116,7 +116,7 @@ func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, path, http.StatusFound)
 }
 
-func (h *CommentHandler) GetPostsComments(posts []models.Post) ([]models.Post, error) {
+func (h *CommentHandler) GetPostsComments(posts []*models.Post) ([]*models.Post, error) {
 	for p, post := range posts {
 		comments, err := h.App.Comments.GetCommentByPostID(post.ID)
 		if err != nil {

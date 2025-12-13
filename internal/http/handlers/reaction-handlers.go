@@ -15,7 +15,7 @@ type ReactionHandler struct {
 }
 
 // GetPostsLikesAndDislikes updates the reactions of each post in the given slice
-func (h *ReactionHandler) GetPostsLikesAndDislikes(posts []models.Post) []models.Post {
+func (h *ReactionHandler) GetPostsLikesAndDislikes(posts []*models.Post) []*models.Post {
 	for p, post := range posts {
 		likes, dislikes, err := h.App.Reactions.CountReactions(post.ID, 0) // Pass 0 for CommentID if it's a post
 		// fmt.Printf("PostID: %v, Likes: %v, Dislikes: %v\n", posts[i].ID, likes, dislikes)
@@ -24,14 +24,14 @@ func (h *ReactionHandler) GetPostsLikesAndDislikes(posts []models.Post) []models
 			log.Printf(ErrorMsgs.Generic, "Error counting reactions", postStr, "GetPostsLikesAndDislikes", err)
 			likes, dislikes = 0, 0 // Default values if there is an error
 		}
-		models.React(&posts[p], likes, dislikes)
+		models.React(posts[p], likes, dislikes)
 	}
 	return posts
 }
 
-func (h *ReactionHandler) getLastReactionTimeForPosts(posts []models.Post) ([]models.Post, error) {
+func (h *ReactionHandler) getLastReactionTimeForPosts(posts []*models.Post) ([]*models.Post, error) {
 	for i := range posts {
-		p := &posts[i]
+		p := posts[i]
 
 		if p.Likes < 0 || p.Dislikes < 0 {
 			continue

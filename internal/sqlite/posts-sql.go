@@ -29,7 +29,7 @@ func (m *PostModel) Insert(title, content, images, author, authorAvatar string, 
 	return int64(id), nil
 }
 
-func (m *PostModel) All() ([]models.Post, error) {
+func (m *PostModel) All() ([]*models.Post, error) {
 	stmt := "SELECT * FROM Posts ORDER BY Created DESC"
 	rows, selectErr := m.DB.Query(stmt)
 	if selectErr != nil {
@@ -44,7 +44,7 @@ func (m *PostModel) All() ([]models.Post, error) {
 		}
 	}()
 
-	var Posts []models.Post
+	var Posts []*models.Post
 	for rows.Next() {
 		p := models.Post{}
 		scanErr := rows.Scan(
@@ -64,7 +64,7 @@ func (m *PostModel) All() ([]models.Post, error) {
 			log.Printf(ErrorMsgs.Query, stmt, scanErr)
 			return nil, scanErr
 		}
-		Posts = append(Posts, p)
+		Posts = append(Posts, &p)
 	}
 
 	if rowsErr := rows.Err(); rowsErr != nil {
@@ -76,7 +76,7 @@ func (m *PostModel) All() ([]models.Post, error) {
 	return Posts, nil
 }
 
-func (m *PostModel) GetPostsByUserID(user models.UUIDField) ([]models.Post, error) {
+func (m *PostModel) GetPostsByUserID(user models.UUIDField) ([]*models.Post, error) {
 	stmt := "SELECT * FROM posts WHERE AuthorID = ? ORDER BY ID DESC"
 	rows, err := m.DB.Query(stmt, user)
 	if err != nil {
@@ -90,7 +90,7 @@ func (m *PostModel) GetPostsByUserID(user models.UUIDField) ([]models.Post, erro
 		}
 	}()
 
-	var Posts []models.Post
+	var Posts []*models.Post
 	for rows.Next() {
 		p := models.Post{}
 		scanErr := rows.Scan(
@@ -110,12 +110,12 @@ func (m *PostModel) GetPostsByUserID(user models.UUIDField) ([]models.Post, erro
 			log.Printf(ErrorMsgs.Query, stmt, scanErr)
 			return nil, scanErr
 		}
-		Posts = append(Posts, p)
+		Posts = append(Posts, &p)
 	}
 	return Posts, nil
 }
 
-func (m *PostModel) GetPostsByChannel(channel int64) ([]models.Post, error) {
+func (m *PostModel) GetPostsByChannel(channel int64) ([]*models.Post, error) {
 	stmt := "SELECT * FROM Posts WHERE ID IN (SELECT PostID FROM PostChannels WHERE ChannelID = ?) ORDER BY Created DESC"
 	rows, err := m.DB.Query(stmt, channel)
 	if err != nil {
@@ -129,7 +129,7 @@ func (m *PostModel) GetPostsByChannel(channel int64) ([]models.Post, error) {
 		}
 	}()
 
-	var Posts []models.Post
+	var Posts []*models.Post
 	for rows.Next() {
 		p := models.Post{}
 		scanErr := rows.Scan(
@@ -149,7 +149,7 @@ func (m *PostModel) GetPostsByChannel(channel int64) ([]models.Post, error) {
 			log.Printf(ErrorMsgs.Query, stmt, scanErr)
 			return nil, scanErr
 		}
-		Posts = append(Posts, p)
+		Posts = append(Posts, &p)
 	}
 
 	// if rowsErr := rows.Err(); rowsErr != nil {
