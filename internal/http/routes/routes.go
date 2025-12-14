@@ -20,7 +20,7 @@ func NewRouter(app *app.App) http.Handler {
 	mux.Handle("/db/", http.StripPrefix("/db/", http.FileServer(http.Dir("./db"))))
 
 	// Core routes
-	mux.HandleFunc("/ws", r.Websocket.HandleWebsocket)
+	mux.HandleFunc("/ws", r.Websocket.ServeWebsocket)
 	mux.HandleFunc("POST /register", r.Auth.Register)
 	mux.HandleFunc("POST /login", r.Auth.Login)
 	mux.HandleFunc("POST /logout", r.Auth.Logout)
