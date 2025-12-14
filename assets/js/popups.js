@@ -20,12 +20,17 @@ export function closePostForm() {
 
 const formChannel = document.querySelector("#form-channel");
 const cancelChannel = document.querySelector("#cancel-channel");
-cancelChannel.popoverTargetElement = formChannel;
-cancelChannel.popoverTargetAction = "hide";
+if (formChannel && cancelChannel) {
+  cancelChannel.popoverTargetElement = formChannel;
+  cancelChannel.popoverTargetAction = "hide";
+}
+
 const formChannelRules = document.querySelector("#form-edit-channel-rules");
 const cancelChannelRules = document.querySelector("#cancel-channel-rules");
-cancelChannelRules.popoverTargetElement = formChannelRules;
-cancelChannelRules.popoverTargetAction = "hide";
+if (formChannelRules && cancelChannelRules) {
+  cancelChannelRules.popoverTargetElement = formChannelRules;
+  cancelChannelRules.popoverTargetAction = "hide";
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   toggleModals();
