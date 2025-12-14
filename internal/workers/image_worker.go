@@ -61,40 +61,6 @@ func NewImageWorkerPool(workers, queueSize int, db *sql.DB) *ImageWorkerPool {
 	return pool
 }
 
-// TODO(human): Exercise 3 Part 1 - Implement Start method
-//
-// Instructions:
-// 1. Start 'workers' number of goroutines
-// 2. Each goroutine should:
-//    a) Add to wait group: pool.wg.Add(1)
-//    b) Launch with 'go func() { ... }()'
-//    c) Defer pool.wg.Done() to signal completion
-//    d) Loop forever, selecting from two channels:
-//       - case job := <-pool.jobs: process the job
-//       - case <-pool.shutdownCh: return (exit worker)
-// 3. Call pool.processJob(job) to handle each job
-//
-// Pattern to follow:
-// func (pool *ImageWorkerPool) Start() {
-//     for i := 0; i < pool.workers; i++ {
-//         pool.wg.Add(1)
-//         go func(workerID int) {
-//             defer pool.wg.Done()
-//             for {
-//                 select {
-//                 case job := <-pool.jobs:
-//                     pool.processJob(job, workerID)
-//                 case <-pool.shutdownCh:
-//                     return
-//                 }
-//             }
-//         }(i)
-//     }
-// }
-
-// TODO(human): Implement the three worker pool methods below (Start, Submit, Shutdown)
-// See detailed instructions in the comments above each method
-
 // Start starts the worker pool
 func (pool *ImageWorkerPool) Start() {
 	for i := 0; i < pool.workers; i++ {
@@ -113,22 +79,6 @@ func (pool *ImageWorkerPool) Start() {
 	}
 }
 
-// TODO(human): Exercise 3 Part 2 - Implement Submit method
-//
-// Instructions:
-// 1. Try to send job to the channel
-// 2. Use select with default to avoid blocking:
-//    select {
-//    case pool.jobs <- job:
-//        return nil (job accepted)
-//    default:
-//        return error (queue full)
-//    }
-// 3. If queue is full, return an error like "worker pool queue is full"
-//
-// Why non-blocking? If the queue is full and we block, the HTTP request
-// would wait. Better to return an error immediately and let the user retry.
-
 // Submit submits a job to the worker pool
 // Returns an error if the queue is full or pool is shut down
 func (pool *ImageWorkerPool) Submit(job ImageJob) error {
@@ -143,24 +93,6 @@ func (pool *ImageWorkerPool) Submit(job ImageJob) error {
 		return fmt.Errorf("worker pool queue is full")
 	}
 }
-
-// TODO(human): Exercise 3 Part 3 - Implement Shutdown method
-//
-// Instructions:
-// 1. Close the shutdown channel: close(pool.shutdownCh)
-//    - This signals all workers to exit
-// 2. Create a done channel: done := make(chan struct{})
-// 3. Start a goroutine that waits for workers:
-//    go func() {
-//        pool.wg.Wait()      // Wait for all workers to finish
-//        close(done)         // Signal that shutdown is complete
-//    }()
-// 4. Use select to wait for either:
-//    - case <-done: return nil (clean shutdown)
-//    - case <-ctx.Done(): return ctx.Err() (timeout)
-//
-// Why? This allows graceful shutdown with a timeout. If workers don't
-// finish processing in time, we can force quit.
 
 // Shutdown gracefully shuts down the worker pool
 // Waits for all workers to finish processing current jobs
@@ -219,37 +151,6 @@ func (pool *ImageWorkerPool) processJob(job ImageJob, workerID int) {
 	log.Printf(workerColors.Green+"[Worker %d] Completed job %s -> %s"+workerColors.Reset+"\n",
 		workerID, job.ID, processedPath)
 
-	// TODO(human): Exercise 3 Part 4 - Save image metadata to database
-	//
-	// Instructions:
-	// Now that the image is successfully processed and saved to disk, we need to
-	// store the metadata in the database so the application knows the image exists.
-	//
-	// 1. Check if pool.imageModel is nil (it's nil in tests)
-	//    If nil, just return early - no database to update
-	//
-	// 2. Call pool.imageModel.Insert() with three parameters:
-	//    - authorID (models.UUIDField) - job.UserID (no conversion needed!)
-	//    - postID (int64) - job.PostID
-	//    - path (string) - processedPath
-	//
-	// 3. Handle the returned values (imageID, err):
-	//    - On error: log with workerColors.Red and return
-	//    - On success: log with workerColors.Blue showing the imageID
-	//
-	// Example pattern:
-	//   if pool.imageModel == nil {
-	//       return // No database in test environment
-	//   }
-	//
-	//   imageID, err := pool.imageModel.Insert(job.UserID, job.PostID, processedPath)
-	//   if err != nil {
-	//       log.Printf(workerColors.Red+"[Worker %d] Failed to save image metadata: %v"+workerColors.Reset+"\n",
-	//           workerID, err)
-	//       return
-	//   }
-	//   log.Printf(workerColors.Blue+"[Worker %d] Saved image metadata (ID: %d)"+workerColors.Reset+"\n",
-	//       workerID, imageID)
 	if pool.imageModel == nil {
 		return // No database in test environment
 	}
