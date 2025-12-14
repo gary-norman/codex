@@ -196,10 +196,21 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 
 	// SECTION -- chats ---
 	var chats []models.Chat
+
 	if userLoggedIn {
+		// GetUserChats for the current user
 		chats, err = h.App.Chats.GetUserChats(currentUser.ID)
 		if err != nil {
 			log.Printf(ErrorMsgs.Query, "RenderIndex > GetUserChats", err)
+		}
+
+		// GetChatMessages for each chat
+		for _, chat := range chats {
+			messages, err := h.App.Chats.GetChatMessages(chat.ID)
+			if err != nil {
+				log.Printf(ErrorMsgs.Query, "RenderIndex > GetChatMessages", err)
+			}
+			chat.Messages = messages
 		}
 	}
 
