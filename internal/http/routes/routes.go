@@ -43,7 +43,8 @@ func NewRouter(app *app.App, loggerPool *workers.LoggerPool) http.Handler {
 	mux.Handle("POST /channels/add-rules/{channelId}", mw.WithUser(http.HandlerFunc(r.Channel.CreateAndInsertRule), r.App))
 	mux.Handle("POST /cdx/post/{postId}/store-comment", mw.WithUser(http.HandlerFunc(r.Comment.StoreComment), r.App))
 
-	// Apply middleware: Logging -> Timeout
-	handler := mw.LoggingEnhanced(loggerPool)(mux)
-	return mw.WithTimeout(handler, 10*time.Second)
+	// Apply middleware chain: Tracing (generates request ID) -> Logging (uses request ID) -> Timeout
+	timeoutHandler := mw.WithTimeout(mux, 10*time.Second)
+	loggingHandler := mw.LoggingEnhanced(loggerPool)(timeoutHandler)
+	return mw.WithTracing(loggingHandler)
 }
