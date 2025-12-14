@@ -33,10 +33,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize app: %v", err)
 	}
-	defer cleanup()
 
 	// CLI commands: migrate + seed
 	if len(os.Args) > 1 {
+		defer cleanup()
 		switch os.Args[1] {
 		case "migrate":
 			migrations, err := discoverMigrations("./migrations")
@@ -68,10 +68,10 @@ func main() {
 	}
 
 	// Otherwise, start the web server
-	startServer(appInstance)
+	startServer(appInstance, cleanup)
 }
 
-func startServer(appInstance *app.App) {
+func startServer(appInstance *app.App, dbCleanup func()) {
 	// pprof server for profiling
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -148,6 +148,7 @@ func startServer(appInstance *app.App) {
 	if err := loggerPool.Shutdown(shutdownCtx); err != nil {
 		log.Printf("Warning: Logger pool shutdown timeout: %v", err)
 	}
+	dbCleanup()
 
 	log.Println(Colors.Teal + "Graceful shutdown complete." + Colors.Reset)
 }
