@@ -33,10 +33,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize app: %v", err)
 	}
+	defer cleanup()
 
 	// CLI commands: migrate + seed
 	if len(os.Args) > 1 {
-		defer cleanup() // Cleanup after CLI commands
 		switch os.Args[1] {
 		case "migrate":
 			migrations, err := discoverMigrations("./migrations")
@@ -67,11 +67,11 @@ func main() {
 		}
 	}
 
-	// Otherwise, start the web server (pass cleanup for graceful shutdown)
-	startServer(appInstance, cleanup)
+	// Otherwise, start the web server
+	startServer(appInstance)
 }
 
-func startServer(appInstance *app.App, dbCleanup func()) {
+func startServer(appInstance *app.App) {
 	// pprof server for profiling
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -120,26 +120,34 @@ func startServer(appInstance *app.App, dbCleanup func()) {
 
 	log.Println("Shutting down gracefully...")
 
-	// 1. Shutdown HTTP server (stops accepting new requests)
-	log.Println("Stopping HTTP server...")
+	// TODO(human): Exercise 5 - Implement graceful shutdown sequence
+	//
+	// Current problem: Database might close while queries are still running!
+	// The defer cleanup() in main() will close the DB as soon as main() exits,
+	// but handlers might still be processing requests with active DB queries.
+	//
+	// Your task: Implement proper shutdown order
+	// 1. Shutdown HTTP server (srv.Shutdown stops accepting new requests, waits for handlers)
+	// 2. Shutdown logger pool (drain pending logs with loggerPool.Shutdown)
+	// 3. Add log message explaining that srv.Shutdown already waited for DB operations
+	// 4. Close database connection (hint: you'll need to pass cleanup function to startServer)
+	//
+	// Hints:
+	// - srv.Shutdown(shutdownCtx) blocks until all handlers complete
+	// - Since handlers run DB queries synchronously, waiting for handlers = waiting for queries
+	// - You'll need to modify the function signature: startServer(appInstance *app.App, dbCleanup func())
+	// - Call dbCleanup() after everything else shuts down
+	// - Move defer cleanup() from main() to only run for CLI commands
+
+	// Your implementation here:
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf(ErrorMsgs.Shutdown, err)
 	}
 
-	// 2. Shutdown logger pool (drain pending logs)
 	log.Println("Draining log queue...")
 	if err := loggerPool.Shutdown(shutdownCtx); err != nil {
 		log.Printf("Warning: Logger pool shutdown timeout: %v", err)
 	}
-
-	// 3. Wait for in-flight database operations to complete
-	// srv.Shutdown() already waits for handlers to complete, which includes their DB queries
-	// This ensures all active queries finish before we close the DB
-	log.Println("Waiting for database operations to complete...")
-
-	// 4. Close database connection
-	log.Println("Closing database connection...")
-	dbCleanup()
 
 	log.Println(Colors.Teal + "Graceful shutdown complete." + Colors.Reset)
 }
