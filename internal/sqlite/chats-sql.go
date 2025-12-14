@@ -11,32 +11,26 @@ type ChatModel struct {
 	DB *sql.DB
 }
 
-func (c *ChatModel) CreateChat(chatType, name string, groupID, buddyID models.UUIDField) (int64, error) {
-	query := "INSERT INTO Chats (Type, Name, GroupID, BuddyID, Created) VALUES (?, ?, ?, ?, DateTime('now'))"
-	result, err := c.DB.Exec(query, chatType, name, groupID, buddyID)
+func (c *ChatModel) CreateChat(chatType, name string, groupID, buddyID models.UUIDField) (models.UUIDField, error) {
+	chatID := models.NewUUIDField()
+	query := "INSERT INTO Chats (ID, Type, Name, GroupID, BuddyID, Created) VALUES (?, ?, ?, ?, ?, DateTime('now'))"
+	_, err := c.DB.Exec(query, chatID, chatType, name, groupID, buddyID)
 	if err != nil {
-		return 0, fmt.Errorf("failed to insert chat: %w", err)
-	}
-	chatID, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get chat ID: %w", err)
+		return models.UUIDField{}, fmt.Errorf("failed to insert chat: %w", err)
 	}
 
-	return int64(chatID), nil
+	return chatID, nil
 }
 
-func (c *ChatModel) CreateChatMessage(chatID, userID models.UUIDField, message string) (int64, error) {
-	query := "INSERT INTO Messages (ChatID, UserID, Created, Content) VALUES (?, ?, DateTime('now'), ?)"
-	result, err := c.DB.Exec(query, chatID, userID, message)
+func (c *ChatModel) CreateChatMessage(chatID, userID models.UUIDField, message string) (models.UUIDField, error) {
+	messageID := models.NewUUIDField()
+	query := "INSERT INTO Messages (ID, ChatID, UserID, Created, Content) VALUES (?, ?, ?, DateTime('now'), ?)"
+	_, err := c.DB.Exec(query, messageID, chatID, userID, message)
 	if err != nil {
-		return 0, fmt.Errorf("failed to insert message: %w", err)
-	}
-	messageID, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get message ID: %w", err)
+		return models.UUIDField{}, fmt.Errorf("failed to insert message: %w", err)
 	}
 
-	return int64(messageID), nil
+	return messageID, nil
 }
 
 func (c *ChatModel) AttachUserToChat(chatID, userID models.UUIDField) error {
@@ -75,7 +69,7 @@ func (c *ChatModel) GetChat(chatID models.UUIDField) (*models.Chat, error) {
 	row := c.DB.QueryRow(query, chatID)
 
 	var chat models.Chat
-	var buddyID, groupID sql.NullString
+	var buddyID, groupID models.NullableUUIDField
 
 	err := row.Scan(&chat.ID, &chat.ChatType, &chat.Name, &chat.Created, &chat.LastActive, &groupID, &buddyID)
 	if err != nil {
@@ -85,19 +79,11 @@ func (c *ChatModel) GetChat(chatID models.UUIDField) (*models.Chat, error) {
 		return nil, fmt.Errorf("failed to scan chat: %w", err)
 	}
 
-	// TODO: Load Buddy user details if buddyID.Valid
-	// TODO: Load Group details if groupID.Valid
-	// For now, just store the IDs
 	if groupID.Valid {
-		if id, err := models.UUIDFieldFromString(groupID.String); err == nil {
-			chat.Group.ID = id
-		}
+		chat.Group.ID = groupID.UUID
 	}
 	if buddyID.Valid {
-		// Will need to fetch user separately or use JOIN
-		if id, err := models.UUIDFieldFromString(buddyID.String); err == nil {
-			chat.Buddy = &models.User{ID: id}
-		}
+		chat.Buddy = &models.User{ID: buddyID.UUID}
 	}
 
 	return &chat, nil
@@ -122,24 +108,18 @@ func (c *ChatModel) GetUserChats(userID models.UUIDField) ([]models.Chat, error)
 	var chats []models.Chat
 	for rows.Next() {
 		var chat models.Chat
-		var buddyID, groupID sql.NullString
+		var buddyID, groupID models.NullableUUIDField
 
 		err := rows.Scan(&chat.ID, &chat.ChatType, &chat.Name, &chat.Created, &chat.LastActive, &groupID, &buddyID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan chat: %w", err)
 		}
 
-		// TODO: Load Buddy user details if buddyID.Valid
-		// TODO: Load Group details if groupID.Valid
 		if groupID.Valid {
-			if id, err := models.UUIDFieldFromString(groupID.String); err == nil {
-				chat.Group.ID = id
-			}
+			chat.Group.ID = groupID.UUID
 		}
 		if buddyID.Valid {
-			if id, err := models.UUIDFieldFromString(buddyID.String); err == nil {
-				chat.Buddy = &models.User{ID: id}
-			}
+			chat.Buddy = &models.User{ID: buddyID.UUID}
 		}
 
 		chats = append(chats, chat)
@@ -148,6 +128,7 @@ func (c *ChatModel) GetUserChats(userID models.UUIDField) ([]models.Chat, error)
 	return chats, nil
 }
 
+// GetChatMessages retrieves all messages for a specific chat
 func (c *ChatModel) GetChatMessages(chatID models.UUIDField) ([]models.ChatMessage, error) {
 	query := `
 		SELECT
@@ -174,19 +155,19 @@ func (c *ChatModel) GetChatMessages(chatID models.UUIDField) ([]models.ChatMessa
 
 		// Use sql.Null types for potentially NULL user fields
 		var (
-			userID          sql.NullString
-			username        sql.NullString
-			email           sql.NullString
-			avatar          sql.NullString
-			banner          sql.NullString
-			description     sql.NullString
-			usertype        sql.NullString
-			userCreated     sql.NullTime
-			userUpdated     sql.NullTime
-			isFlagged       sql.NullBool
-			sessionToken    sql.NullString
-			csrfToken       sql.NullString
-			hashedPassword  sql.NullString
+			userID         sql.NullString
+			username       sql.NullString
+			email          sql.NullString
+			avatar         sql.NullString
+			banner         sql.NullString
+			description    sql.NullString
+			usertype       sql.NullString
+			userCreated    sql.NullTime
+			userUpdated    sql.NullTime
+			isFlagged      sql.NullBool
+			sessionToken   sql.NullString
+			csrfToken      sql.NullString
+			hashedPassword sql.NullString
 		)
 
 		err := rows.Scan(
