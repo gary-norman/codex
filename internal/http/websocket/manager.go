@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gary-norman/forum/internal/app"
 	"github.com/gary-norman/forum/internal/http/handlers"
@@ -11,23 +12,48 @@ import (
 )
 
 type Manager struct {
-	App          *app.App
-	User         *handlers.UserHandler
-	Post         *handlers.PostHandler
-	Comment      *handlers.CommentHandler
-	Reaction     *handlers.ReactionHandler
-	Channel      *handlers.ChannelHandler
-	Mod          *handlers.ModHandler
-	Clients      ClientList
-	sync.RWMutex //read/write lock in Go. It protects shared data when multiple goroutines access it, allowing many readers at the same time but only one writer at a time.
+	App           *app.App
+	User          *handlers.UserHandler
+	Post          *handlers.PostHandler
+	Comment       *handlers.CommentHandler
+	Reaction      *handlers.ReactionHandler
+	Channel       *handlers.ChannelHandler
+	Mod           *handlers.ModHandler
+	Clients       ClientList
+	sync.RWMutex  //read/write lock in Go. It protects shared data when multiple goroutines access it, allowing many readers at the same time but only one writer at a time.
+	EventHandlers map[string]EventHandler
 	// Notification *NotificationHandler
 	// Membership *MembershipHandler
 }
 
 func NewManager() *Manager {
-	return &Manager{
-		Clients: make(ClientList), //creates a client list whenever a new manager is created so no nil pointer exception
+	m := &Manager{
+		Clients:       make(ClientList), //creates a client list whenever a new manager is created so no nil pointer exception
+		EventHandlers: make(map[string]EventHandler),
 	}
+	m.setupEventHandlers()
+	return m
+}
+
+func (ws *Manager) routeEvent(event Event, c *Client) error {
+	if handler, ok := ws.EventHandlers[event.Type]; ok {
+		if err := handler(event, c); err != nil {
+			return err
+		}
+		return nil
+	} else {
+		return errors.New("event type not found")
+	}
+
+}
+
+func (ws *Manager) setupEventHandlers() {
+	ws.EventHandlers[EventSendMessage] = SendMessage
+}
+
+func SendMessage(event Event, c *Client) error {
+	fmt.Println(event)
+	return nil
 }
 
 func (ws *Manager) ServeWebsocket(w http.ResponseWriter, r *http.Request) {
