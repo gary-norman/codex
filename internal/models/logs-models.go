@@ -2,68 +2,82 @@ package models
 
 import (
 	"context"
-	"io"
+	"fmt"
 	"log"
-	"os"
+	"time"
 )
-
-type Logs struct {
-	infoLog    *log.Logger
-	warningLog *log.Logger
-	errorLog   *log.Logger
-}
 
 // LogContextKey is the type used for context keys
 type LogContextKey string
 
 const RequestIDKey LogContextKey = "requestID"
 
-// CreateLogs creates a new Logs instance with optional file logging
-func CreateLogs(logToFile bool, filename string) (*Logs, error) {
-	var writers []io.Writer
-	writers = append(writers, os.Stdout)
-
-	if logToFile {
-		logFile, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
-		if err != nil {
-			return nil, err
-		}
-		writers = append(writers, logFile)
-	}
-
-	multi := io.MultiWriter(writers...)
-
-	logs := &Logs{
-		infoLog:    log.New(multi, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile),
-		warningLog: log.New(multi, "WARNING: ", log.Ldate|log.Ltime|log.Lshortfile),
-		errorLog:   log.New(io.MultiWriter(os.Stderr), "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile),
-	}
-
-	return logs, nil
-}
-
 // WithRequestID is a helper function that adds a Request ID to a context
 func WithRequestID(ctx context.Context, requestID string) context.Context {
 	return context.WithValue(ctx, RequestIDKey, requestID)
 }
 
-// LogWithContext logs a message with a context (if request ID exists)
-func (l *Logs) LogWithContext(ctx context.Context, level string, msg string) {
-	requestID, _ := ctx.Value(RequestIDKey).(string)
+// GetRequestID retrieves the request ID from context
+func GetRequestID(ctx context.Context) string {
+	if reqID, ok := ctx.Value(RequestIDKey).(string); ok {
+		return reqID
+	}
+	return ""
+}
 
-	formatted := msg
+// LogInfo logs an info message with timestamp, icon, and color
+func LogInfo(msg string, args ...any) {
+	timestamp := time.Now().Format("15:04:05")
+	formatted := fmt.Sprintf("%s%s%s ℹ️  %s%s%s",
+		Colors.Subtext0, timestamp, Colors.Reset,
+		Colors.Green, fmt.Sprintf(msg, args...), Colors.Reset)
+	log.Println(formatted)
+}
+
+// LogWarn logs a warning message with timestamp, icon, and color
+func LogWarn(msg string, args ...any) {
+	timestamp := time.Now().Format("15:04:05")
+	formatted := fmt.Sprintf("%s%s%s ⚠️  %s%s%s",
+		Colors.Subtext0, timestamp, Colors.Reset,
+		Colors.Peach, fmt.Sprintf(msg, args...), Colors.Reset)
+	log.Println(formatted)
+}
+
+// LogError logs an error message with timestamp, icon, color, and optional error
+func LogError(msg string, err error, args ...any) {
+	timestamp := time.Now().Format("15:04:05")
+	formatted := fmt.Sprintf("%s%s%s ❌ %s%s%s",
+		Colors.Subtext0, timestamp, Colors.Reset,
+		Colors.Red, fmt.Sprintf(msg, args...), Colors.Reset)
+	if err != nil {
+		formatted += fmt.Sprintf(" %s%v%s", Colors.Text, err, Colors.Reset)
+	}
+	log.Println(formatted)
+}
+
+// LogInfoWithContext logs an info message with request ID from context
+func LogInfoWithContext(ctx context.Context, msg string, args ...any) {
+	requestID := GetRequestID(ctx)
 	if requestID != "" {
-		formatted = "[RequestID: " + requestID + "] " + msg
+		msg = fmt.Sprintf("[%s] %s", requestID, msg)
 	}
+	LogInfo(msg, args...)
+}
 
-	switch level {
-	case "info":
-		l.infoLog.Output(2, formatted)
-	case "warn":
-		l.warningLog.Output(2, formatted)
-	case "error":
-		l.errorLog.Output(2, formatted)
-	default:
-		l.infoLog.Output(2, formatted)
+// LogWarnWithContext logs a warning message with request ID from context
+func LogWarnWithContext(ctx context.Context, msg string, args ...any) {
+	requestID := GetRequestID(ctx)
+	if requestID != "" {
+		msg = fmt.Sprintf("[%s] %s", requestID, msg)
 	}
+	LogWarn(msg, args...)
+}
+
+// LogErrorWithContext logs an error message with request ID from context
+func LogErrorWithContext(ctx context.Context, msg string, err error, args ...any) {
+	requestID := GetRequestID(ctx)
+	if requestID != "" {
+		msg = fmt.Sprintf("[%s] %s", requestID, msg)
+	}
+	LogError(msg, err, args...)
 }
