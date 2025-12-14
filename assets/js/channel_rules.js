@@ -11,6 +11,13 @@ export function listenToRules() {
     const existingRulesContainer = document.querySelector(
         "#rules-wrapper-existing",
     );
+
+    // Early return if required elements don't exist (popover not on this page)
+    if (!addButton || !submitButton || !addedRulesWrapper || !removedRulesWrapper ||
+        !inputField || !hiddenInput || !existingRulesContainer) {
+        return;
+    }
+
     let existingRules = existingRulesContainer.querySelectorAll(
         '[id^="existing-channel-rule-"]',
     );
