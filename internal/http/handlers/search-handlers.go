@@ -53,7 +53,7 @@ func (s *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 		log.Printf(ErrorMsgs.Query, "getHome> users > All", allUsersErr)
 	}
 
-	log.Printf("allUsers: %v\n\n", allUsers)
+	//log.Printf("allUsers: %v\n\n", allUsers)
 
 	currentUser, ok := mw.GetUserFromContext(r.Context())
 	if !ok {
