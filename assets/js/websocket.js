@@ -1,35 +1,62 @@
-let socket;
+let connection;
 
 let isConnecting = false;  // Flag to track connection state
 
+class Event {
+    constructor(type, payload){
+        this.type = type;
+        this.payload = payload;
+    }
+}
+
+function routeEvent(event) {
+    if (event.type === undefined ) {
+        alert("no type field in the event")
+    }
+
+    switch(event.type) {
+        case "new message":
+            console.log("message received", event.payload)
+            break;
+        default:
+            alert("unsupported message type")
+    }
+}
+
+function sendEvent(eventName, payload) {
+    const event = new Event(eventName, payload);
+    connection.send(JSON.stringify(event));
+}
+
 function connectWebSocket() {
-    if (isConnecting || (socket && socket.readyState === WebSocket.OPEN)) {
+    if (isConnecting || (connection && connection.readyState === WebSocket.OPEN)) {
         return;
     }
 
     isConnecting = true;
-    console.log("Attempting to connect to ws://localhost:8888/ws");
 
-    socket = new WebSocket("ws://localhost:8888/ws");
+    connection = new WebSocket("ws://localhost:8888/ws");
 
-    socket.onopen = function() {
-        console.log("✅ WebSocket OPEN - readyState:", socket.readyState);
-        isConnecting = false;
+    connection.onopen = function() {
+        console.log("✅ WebSocket OPEN - readyState:", connection.readyState);
+        isConnecting = true;
     };
 
-    socket.onmessage = function(event) {
-        console.log("📨 Message received:", event.data);
-        const outputMessage = document.getElementById("outputMessage");
-        outputMessage.innerHTML += `<p>${event.data}</p>`;
+    connection.onmessage = function(evt) {
+        const eventData = JSON.parse(evt.data);
+
+        const event = Object.assign(new Event, eventData);
+
+        routeEvent(event); 
     };
 
-    socket.onerror = function(error) {
-        console.error("❌ WebSocket ERROR - readyState:", socket.readyState);
+    connection.onerror = function(error) {
+        console.error("❌ WebSocket ERROR - readyState:", connection.readyState);
         console.error("Error details:", error);
         isConnecting = false;
     };
 
-    socket.onclose = function(event) {
+    connection.onclose = function(event) {
         console.log("❌ WebSocket CLOSED");
         console.log("Close code:", event.code);
         console.log("Close reason:", event.reason);
@@ -53,18 +80,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 export function sendMessage() {
     const messageInput = document.getElementById("messageInput");
-    const message = messageInput.value;
 
-    console.log("sent!")
-
-    // Check if WebSocket is open before sending
-    if (socket.readyState === WebSocket.OPEN) {
-        socket.send(message);
-        messageInput.value = "";
-    } else {
-        console.error("WebSocket is not open. State:", socket.readyState);
-        alert("Connection is closed. Reconnecting...");
-        // Optionally reconnect
-        connectWebSocket();
+    if (messageInput != null) {
+        sendEvent("send_message", messageInput.value);
+        return
     }
+
+
 }
