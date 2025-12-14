@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,7 +33,7 @@ func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
 	parseErr := r.ParseMultipartForm(10 << 20)
 	if parseErr != nil {
 		http.Error(w, parseErr.Error(), 400)
-		log.Printf(ErrorMsgs.Parse, "storeComment", parseErr)
+		models.LogErrorWithContext(r.Context(), "Failed to parse multipart form", parseErr)
 		return
 	}
 
@@ -48,7 +47,7 @@ func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
 
 	var channelData models.ChannelData
 	if err := json.Unmarshal([]byte(selectionJSON), &channelData); err != nil {
-		log.Printf(ErrorMsgs.Unmarshal, selectionJSON, err)
+		models.LogErrorWithContext(r.Context(), "Failed to unmarshal channel data", err)
 		http.Error(w, "Invalid selection format", http.StatusBadRequest)
 		return
 	}
@@ -59,19 +58,19 @@ func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
 	// Convert postIDStr to an integer
 	postID, postConvErr := strconv.ParseInt(postIDStr, 10, 64)
 	if postConvErr != nil {
-		log.Printf("Error converting postID: %v", postID)
+		models.LogWarnWithContext(r.Context(), "Failed to convert postID: %s", postConvErr, postIDStr)
 	}
 
 	// Convert commentIDStr to an integer
 	commentID, commentConvErr := strconv.ParseInt(commentIDStr, 10, 64)
 	if commentConvErr != nil {
-		log.Printf("Error converting commentID: %v", commentID)
+		models.LogWarnWithContext(r.Context(), "Failed to convert commentID: %s", commentConvErr, commentIDStr)
 	}
 
 	// Convert ChannelID to an integer
 	channelID, channelIDConvErr := strconv.ParseInt(channelData.ChannelID, 10, 64)
 	if channelIDConvErr != nil {
-		log.Printf("Error converting channelID: %v", channelData.ChannelID)
+		models.LogWarnWithContext(r.Context(), "Failed to convert channelID: %s", channelIDConvErr, channelData.ChannelID)
 	}
 
 	// Assign the returned values
@@ -106,7 +105,7 @@ func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
 	insertErr := h.App.Comments.Upsert(commentData)
 
 	if insertErr != nil {
-		log.Printf(ErrorMsgs.Comment, insertErr)
+		models.LogErrorWithContext(r.Context(), "Failed to upsert comment", insertErr)
 		http.Error(w, insertErr.Error(), 500)
 		return
 	}
