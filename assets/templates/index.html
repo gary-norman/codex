@@ -345,6 +345,7 @@
     </div>
 
     {{/*SECTION ---------- edit channel rules popover ---------- */}}
+    {{ if .ThisChannel }}
     <div popover id="form-edit-channel-rules">
       <form id="popover-form-edit-channel-rules" action="/channels/add-rules/{{.ThisChannel.ID}}" class="wrapper-form"
         method="POST">
@@ -380,6 +381,7 @@
         </div>
       </form>
     </div>
+    {{ end }}
 
     {{/*SECTION ---------- sidebar ---------- */}}
     <aside class="sidebar">
