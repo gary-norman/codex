@@ -43,8 +43,7 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 	// WaitGroup to track goroutine completion
 	var wg sync.WaitGroup
 
-	// TODO(human): Exercise 4 Part 1 - Implement concurrent user search
-	// Launch goroutine to search users
+	// Launch goroutine to search users with circuit breaker protection
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -55,9 +54,12 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 			return
 		default:
 		}
-
-		// Perform user search
-		users, err := app.Users.All()
+		var users []*models.User
+		err := app.DBCircuit.Execute(func() error {
+			var execErr error
+			users, execErr = app.Users.All()
+			return execErr
+		})
 		if err != nil {
 			errorsCh <- searchError{Source: "users", Err: err}
 			return
@@ -65,8 +67,7 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 		usersCh <- users
 	}()
 
-	// TODO(human): Exercise 4 Part 2 - Implement concurrent post search
-	// Launch goroutine to search posts
+	// Launch goroutine to search posts with circuit breaker protection
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -77,9 +78,12 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 			return
 		default:
 		}
-
-		// Perform post search
-		posts, err := app.Posts.All()
+		var posts []*models.Post
+		err := app.DBCircuit.Execute(func() error {
+			var execErr error
+			posts, execErr = app.Posts.All()
+			return execErr
+		})
 		if err != nil {
 			errorsCh <- searchError{Source: "posts", Err: err}
 			return
@@ -87,8 +91,7 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 		postsCh <- posts
 	}()
 
-	// TODO(human): Exercise 4 Part 3 - Implement concurrent channel search
-	// Launch goroutine to search channels
+	// Launch goroutine to search channels with circuit breaker protection
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -99,9 +102,12 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 			return
 		default:
 		}
-
-		// Perform channel search
-		channels, err := app.Channels.All()
+		var channels []*models.Channel
+		err := app.DBCircuit.Execute(func() error {
+			var execErr error
+			channels, execErr = app.Channels.All()
+			return execErr
+		})
 		if err != nil {
 			errorsCh <- searchError{Source: "channels", Err: err}
 			return
@@ -109,7 +115,6 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 		channelsCh <- channels
 	}()
 
-	// TODO(human): Exercise 4 Part 4 - Wait for all goroutines and collect results
 	// Close error channel when all workers are done
 	go func() {
 		wg.Wait()

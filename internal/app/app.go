@@ -8,10 +8,12 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gary-norman/forum/internal/colors"
 	"github.com/gary-norman/forum/internal/db"
 	"github.com/gary-norman/forum/internal/models"
+	"github.com/gary-norman/forum/internal/patterns"
 	"github.com/gary-norman/forum/internal/sqlite"
 )
 
@@ -84,28 +86,33 @@ func initConfig() *Config {
 }
 
 type App struct {
-	DB          *sql.DB // Store DB reference for cleanup
-	Users       *sqlite.UserModel
-	Posts       *sqlite.PostModel
-	Reactions   *sqlite.ReactionModel
-	Saved       *sqlite.SavedModel
-	Mods        *sqlite.ModModel
-	Comments    *sqlite.CommentModel
-	Images      *sqlite.ImageModel
-	Channels    *sqlite.ChannelModel
-	Flags       *sqlite.FlagModel
-	Loyalty     *sqlite.LoyaltyModel
-	Memberships *sqlite.MembershipModel
-	Muted       *sqlite.MutedChannelModel
-	Cookies     *sqlite.CookieModel
-	Rules       *sqlite.RuleModel
-	Chats       *sqlite.ChatModel
-	Paths       models.ImagePaths
+	DB             *sql.DB // Store DB reference for cleanup
+	DBCircuit      *patterns.CircuitBreaker
+	Users          *sqlite.UserModel
+	Posts          *sqlite.PostModel
+	Reactions      *sqlite.ReactionModel
+	Saved          *sqlite.SavedModel
+	Mods           *sqlite.ModModel
+	Comments       *sqlite.CommentModel
+	Images         *sqlite.ImageModel
+	Channels       *sqlite.ChannelModel
+	Flags          *sqlite.FlagModel
+	Loyalty        *sqlite.LoyaltyModel
+	Memberships    *sqlite.MembershipModel
+	Muted          *sqlite.MutedChannelModel
+	Cookies        *sqlite.CookieModel
+	Rules          *sqlite.RuleModel
+	Chats          *sqlite.ChatModel
+	Paths          models.ImagePaths
 }
 
 func NewApp(db *sql.DB, imagePath string) *App {
+	// Initialize circuit breaker: 5 failures, 5 second timeout
+	dbCircuit := patterns.NewCircuitBreaker(5, 5*time.Second)
+
 	return &App{
 		DB:          db,
+		DBCircuit:   dbCircuit,
 		Users:       &sqlite.UserModel{DB: db},
 		Posts:       &sqlite.PostModel{DB: db},
 		Reactions:   &sqlite.ReactionModel{DB: db},
