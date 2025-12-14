@@ -16,6 +16,12 @@ type UUIDField struct {
 	UUID uuid.UUID
 }
 
+// NullableUUIDField is a nullable UUID type
+type NullableUUIDField struct {
+	UUID  UUIDField
+	Valid bool // true if UUID is not NULL
+}
+
 // NewUUIDField automatically generates a new UUID if it's not already set
 func NewUUIDField() UUIDField {
 	return UUIDField{UUID: uuid.New()}
@@ -25,6 +31,10 @@ func NewUUIDField() UUIDField {
 func ZeroUUIDField() UUIDField {
 	return UUIDField{UUID: uuid.Nil}
 }
+
+// -------------------------------------------------------
+// Methods for JSON marshaling/unmarshaling
+// -------------------------------------------------------
 
 // String implements fmt.Stringer
 func (u UUIDField) String() string {
@@ -36,6 +46,7 @@ func (u UUIDField) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.UUID.String())
 }
 
+// UnmarshalJSON unmarshals the UUID from JSON
 func (u *UUIDField) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := json.Unmarshal(data, &str); err != nil {
@@ -49,7 +60,11 @@ func (u *UUIDField) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// -------------------------------------------------------
 // SQL driver interfaces
+// -------------------------------------------------------
+
+// copyFromBytes copies the UUID from a byte slice.
 func (u *UUIDField) copyFromBytes(src any) error {
 	switch v := src.(type) {
 	case []byte:
@@ -60,30 +75,63 @@ func (u *UUIDField) copyFromBytes(src any) error {
 	}
 }
 
+// Exec implements the sql.Execer interface.
 func (u *UUIDField) Exec(value any) error {
 	return u.copyFromBytes(value)
 }
 
+// Scan implements the sql.Scanner interface.
 func (u *UUIDField) Scan(value any) error {
 	return u.copyFromBytes(value)
 }
 
+// Begin implements the sql.Tx interface.
 func (u *UUIDField) Begin(value any) error {
 	return u.copyFromBytes(value)
 }
 
+// Commit implements the sql.Tx interface.
 func (u *UUIDField) Commit(value any) error {
 	return u.copyFromBytes(value)
 }
 
+// Value implements the driver.Valuer interface.
 func (u UUIDField) Value() (driver.Value, error) {
 	return u.UUID[:], nil // store as []byte
 }
 
+// UUIDFieldFromString converts a string to a UUIDField
 func UUIDFieldFromString(s string) (UUIDField, error) {
 	parsed, err := uuid.Parse(s)
 	if err != nil {
 		return UUIDField{}, err
 	}
 	return UUIDField{UUID: parsed}, nil
+}
+
+// Scan implements the sql.Scanner interface.
+func (u *NullableUUIDField) Scan(value any) error {
+	switch v := value.(type) {
+	case nil:
+		u.Valid = false
+		return nil
+	case []byte:
+		parsed, err := uuid.ParseBytes(v)
+		if err != nil {
+			return err
+		}
+		u.UUID = UUIDField{UUID: parsed}
+		u.Valid = true
+		return nil
+	default:
+		return fmt.Errorf("NullableUUIDField: cannot scan type %T", v)
+	}
+}
+
+// Value implements the driver.Valuer interface.
+func (u NullableUUIDField) Value() (driver.Value, error) {
+	if !u.Valid {
+		return nil, nil
+	}
+	return u.UUID.Value()
 }
