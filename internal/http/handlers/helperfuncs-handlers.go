@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"io"
-	"log"
 	"math/rand/v2"
 	"mime/multipart"
 	"net/http"
@@ -73,39 +72,39 @@ func GetFileName(r *http.Request, fileFieldName, calledBy, imageType string) str
 	// Limit the size of the incoming file to prevent memory issues
 	parseErr := r.ParseMultipartForm(10 << 20) // Limit upload size to 10MB
 	if parseErr != nil {
-		log.Printf(ErrorMsgs.Parse, "image", calledBy, parseErr)
+		models.LogError("Failed to parse multipart form in %s", parseErr, calledBy)
 		return "noimage"
 	}
 	// Retrieve the file from form data
 	file, handler, retrieveErr := r.FormFile(fileFieldName)
 	if retrieveErr != nil {
-		log.Printf(ErrorMsgs.RetrieveFile, "image", calledBy, retrieveErr)
+		models.LogError("Failed to retrieve file in %s", retrieveErr, calledBy)
 		return "noimage"
 	}
 	defer func(file multipart.File) {
 		closeErr := file.Close()
 		if closeErr != nil {
-			log.Printf(ErrorMsgs.Close, file, calledBy, closeErr)
+			models.LogError("Failed to close file in %s", closeErr, calledBy)
 		}
 	}(file)
 	// Create a file in the server's local storage
 	renamedFile := renameFileWithUUID(handler.Filename)
-	fmt.Printf(ErrorMsgs.KeyValuePair, "File Name", renamedFile)
+	models.LogInfo("Saving file: %s", renamedFile)
 	dst, createErr := os.Create("db/userdata/images/" + imageType + "-images/" + renamedFile)
 	if createErr != nil {
-		log.Printf(ErrorMsgs.CreateFile, "image", calledBy, createErr)
+		models.LogError("Failed to create file in %s", createErr, calledBy)
 		return ""
 	}
 	defer func(dst *os.File) {
 		closeErr := dst.Close()
 		if closeErr != nil {
-			log.Printf(ErrorMsgs.Close, dst, calledBy, closeErr)
+			models.LogError("Failed to close destination file in %s", closeErr, calledBy)
 		}
 	}(dst)
 	// Copy the uploaded file data to the server's file
 	_, copyErr := io.Copy(dst, file)
 	if copyErr != nil {
-		fmt.Printf(ErrorMsgs.SaveFile, file, dst, calledBy, copyErr)
+		models.LogError("Failed to save file in %s", copyErr, calledBy)
 		return ""
 	}
 	return renamedFile
