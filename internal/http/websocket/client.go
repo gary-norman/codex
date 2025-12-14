@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"encoding/json"
 	"github.com/gorilla/websocket"
 	"log"
 )
@@ -11,14 +12,14 @@ type Client struct {
 	manager    *Manager
 
 	// egress (means outgoing data) is used to avoid concurrent writes on the websocket connection
-	egress chan []byte
+	egress chan Event
 }
 
 func NewClient(conn *websocket.Conn, manager *Manager) *Client {
 	return &Client{
 		connection: conn,
 		manager:    manager,
-		egress:     make(chan []byte),
+		egress:     make(chan Event),
 	}
 }
 
@@ -31,7 +32,7 @@ func (c *Client) readMessages() {
 	//continuously read messages from the connection
 	for {
 		//message types: ping, pong, data, binary
-		messageType, payload, err := c.connection.ReadMessage()
+		_, payload, err := c.connection.ReadMessage()
 		if err != nil {
 			//check for abnormal closes to connection
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
@@ -43,8 +44,18 @@ func (c *Client) readMessages() {
 			break
 		}
 
-		log.Println(messageType)
-		log.Println(string(payload))
+		var request Event
+
+		//unmarshal json Event message into request
+		if err := json.Unmarshal(payload, &request); err != nil {
+			log.Println("Error unmarshalling message:", err)
+			continue
+		}
+
+		if err := c.manager.routeEvent(request, c); err != nil {
+			log.Println("Error handling Event message:", err)
+			continue
+		}
 	}
 }
 
@@ -55,15 +66,27 @@ func (c *Client) writeMessages() {
 
 	for {
 		select {
+		//When messages are sent, we will write them to egress channel, which will one by one, select them and fire them onto the websocket connection
 		// <- Data flows from the channel "c" into value "message"
 		case message, ok := <-c.egress:
 			if !ok {
+				if err := c.connection.WriteMessage(websocket.CloseMessage, nil); err != nil {
+					log.Println("Error writing message; connection closed:", err)
+					return
+				}
+			}
+
+			//marshal message into a JSON
+			data, err := json.Marshal(message)
+			if err != nil {
+				log.Println("Error marshalling message:", err)
 				return
 			}
-			if err := c.connection.WriteMessage(websocket.TextMessage, message); err != nil {
+			if err := c.connection.WriteMessage(websocket.TextMessage, data); err != nil {
 				log.Println("Error writing message:", err)
-				return
 			}
+			log.Println("message sent")
+
 		}
 	}
 }
