@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 
@@ -36,7 +35,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			"message": "username must be between 5 and 16 characters",
 		})
 		if err != nil {
-			log.Printf(ErrorMsgs.Encode, "register: username", err)
+			models.LogErrorWithContext(r.Context(), "Failed to encode register response (username validation)", err)
 			return
 		}
 		return
@@ -49,7 +48,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 				"and at least 8 or more characters",
 		})
 		if err != nil {
-			log.Printf(ErrorMsgs.Encode, "register: password", err)
+			models.LogErrorWithContext(r.Context(), "Failed to encode register response (password validation)", err)
 			return
 		}
 		return
@@ -61,7 +60,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			"message": "please enter a valid email address",
 		})
 		if err != nil {
-			log.Printf(ErrorMsgs.Encode, "register: validEmail", err)
+			models.LogErrorWithContext(r.Context(), "Failed to encode register response (email validation)", err)
 			return
 		}
 		return
@@ -75,7 +74,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			"body":    emailErr,
 		})
 		if encErr != nil {
-			log.Printf(ErrorMsgs.Encode, "register: emailExists", encErr)
+			models.LogErrorWithContext(r.Context(), "Failed to encode register response (email exists)", encErr)
 			return
 		}
 		return
@@ -89,7 +88,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			"body":    usernameErr,
 		})
 		if encErr != nil {
-			log.Printf(ErrorMsgs.Encode, "register: userExists", encErr)
+			models.LogErrorWithContext(r.Context(), "Failed to encode register response (username exists)", encErr)
 			return
 		}
 		return
@@ -97,7 +96,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	user, err := service.NewUser(username, email, password)
 	if err != nil {
-		fmt.Printf(ErrorMsgs.KeyValuePair, fmt.Sprintf("Error creating user: %v", username), err)
+		models.LogErrorWithContext(r.Context(), "Failed to create user %s", err, username)
 	}
 
 	if err := h.App.Users.Insert(
@@ -112,14 +111,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		user.CSRFToken,
 		user.HashedPassword,
 	); err != nil {
-		fmt.Println("Error inserting user:", err)
+		models.LogErrorWithContext(r.Context(), "Failed to insert user into database", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		encErr := json.NewEncoder(w).Encode(map[string]any{
 			"code":    http.StatusInternalServerError,
 			"message": "registration failed!",
 		})
 		if encErr != nil {
-			log.Printf(ErrorMsgs.Encode, "register: insertErr", encErr)
+			models.LogErrorWithContext(r.Context(), "Failed to encode register error response", encErr)
 			return
 		}
 	}
@@ -140,7 +139,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		"body":    FormFields{Fields: formFields},
 	})
 	if encErr != nil {
-		log.Println(fmt.Errorf(ErrorMsgs.Encode, "register: success", encErr))
+		models.LogErrorWithContext(r.Context(), "Failed to encode register success response", encErr)
 		return
 	}
 
@@ -168,21 +167,21 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if getUserErr != nil {
 		// Respond with an unsuccessful login message
 		w.Header().Set("Content-Type", "application/json")
-		log.Printf(ErrorMsgs.NotFound, login, "login > GetUserFromLogin", getUserErr)
+		models.LogWarnWithContext(r.Context(), "User not found: %s", getUserErr, login)
 		w.WriteHeader(http.StatusOK)
 		encErr := json.NewEncoder(w).Encode(map[string]any{
 			"code":    http.StatusUnauthorized,
 			"message": "user not found",
 		})
 		if encErr != nil {
-			log.Printf(ErrorMsgs.Encode, "login: CreateCookies", encErr)
+			models.LogErrorWithContext(r.Context(), "Failed to encode login response (user not found)", encErr)
 			return
 		}
 		return
 	}
 
 	if models.CheckPasswordHash(password, user.HashedPassword) {
-		fmt.Printf(Colors.Green+"Passwords for %v match\n"+Colors.Reset, user.Username)
+		models.LogInfoWithContext(r.Context(), "Successful login for user: %s", user.Username)
 		// Set Session Token and CSRF Token cookies
 		createCookiErr := h.App.Cookies.CreateCookies(w, user)
 		if createCookiErr != nil {
@@ -193,7 +192,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 				"body":    fmt.Errorf(ErrorMsgs.Cookies, "create", createCookiErr),
 			})
 			if encErr != nil {
-				log.Printf(ErrorMsgs.Encode, "login: CreateCookies", encErr)
+				models.LogErrorWithContext(r.Context(), "Failed to encode login response (cookie creation)", encErr)
 				return
 			}
 			return
@@ -206,7 +205,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			"message": fmt.Sprintf("Welcome, %s! Login successful.", user.Username),
 		})
 		if encErr != nil {
-			log.Printf(ErrorMsgs.Encode, "login: success", encErr)
+			models.LogErrorWithContext(r.Context(), "Failed to encode login success response", encErr)
 			return
 		}
 	} else {
@@ -218,7 +217,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			"message": "incorrect password",
 		})
 		if encErr != nil {
-			log.Println(fmt.Errorf(ErrorMsgs.Encode, "login: fail", encErr))
+			models.LogErrorWithContext(r.Context(), "Failed to encode login failure response", encErr)
 			return
 		}
 	}
@@ -233,7 +232,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	username := cookie.Value
 	if username == "" {
-		log.Printf(ErrorMsgs.KeyValuePair, "aborting logout:", "no user is logged in")
+		models.LogWarnWithContext(r.Context(), "Logout aborted: no user is logged in")
 		return
 	}
 	fmt.Printf(Colors.Peach+"Attempting logout for "+Colors.Text+"%v\n"+Colors.Reset, username)
@@ -241,22 +240,22 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	var user *models.User
 	user, getUserErr := h.App.Users.GetUserByUsername(username, "logout")
 	if getUserErr != nil {
-		log.Printf("GetUserByUsername for %v failed with error: %v", username, getUserErr)
+		models.LogErrorWithContext(r.Context(), "Failed to get user %s for logout", getUserErr, username)
 	}
 
 	// Delete the Session Token and CSRF Token cookies
 	delCookiErr := h.App.Cookies.DeleteCookies(w, user)
 	if delCookiErr != nil {
-		log.Printf(ErrorMsgs.Cookies, "delete", delCookiErr)
+		models.LogErrorWithContext(r.Context(), "Failed to delete cookies during logout", delCookiErr)
 	}
 	// send user confirmation
-	log.Printf(Colors.Green+"%v logged out successfully!"+Colors.Reset, user.Username)
+	models.LogInfoWithContext(r.Context(), "User %s logged out successfully", user.Username)
 	encErr := json.NewEncoder(w).Encode(map[string]any{
 		"code":    http.StatusOK,
 		"message": "Logged out successfully!",
 	})
 	if encErr != nil {
-		log.Printf(ErrorMsgs.Encode, "logout: success", encErr)
+		models.LogErrorWithContext(r.Context(), "Failed to encode logout success response", encErr)
 		return
 	}
 }
@@ -268,16 +267,15 @@ func (h *AuthHandler) Protected(w http.ResponseWriter, r *http.Request) {
 	var user *models.User
 	user, getUserErr := h.App.Users.GetUserFromLogin(login, "protected")
 	if getUserErr != nil {
-		log.Printf("protected route for %v failed with error: %v", login, getUserErr)
+		models.LogErrorWithContext(r.Context(), "Failed to get user %s for protected route", getUserErr, login)
 	}
 	if authErr := h.Session.IsAuthenticated(r, user.Username); authErr != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	fprintf, err := fmt.Fprintf(w, "CSRF Valildation successful! Welcome, %s", user.Username)
+	_, err := fmt.Fprintf(w, "CSRF Valildation successful! Welcome, %s", user.Username)
 	if err != nil {
-		log.Print(ErrorMsgs.Protected, user.Username, err)
+		models.LogErrorWithContext(r.Context(), "Failed to write protected route response for user %s", err, user.Username)
 		return
 	}
-	log.Println(fprintf)
 }
