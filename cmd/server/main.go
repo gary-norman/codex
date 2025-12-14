@@ -28,15 +28,15 @@ var (
 )
 
 func main() {
-	// Initialize app first so it’s available to everything
+	// Initialize app first so it's available to everything
 	appInstance, cleanup, err := app.InitializeApp()
 	if err != nil {
 		log.Fatalf("Failed to initialize app: %v", err)
 	}
-	defer cleanup()
 
 	// CLI commands: migrate + seed
 	if len(os.Args) > 1 {
+		defer cleanup() // Cleanup after CLI commands
 		switch os.Args[1] {
 		case "migrate":
 			migrations, err := discoverMigrations("./migrations")
@@ -67,11 +67,11 @@ func main() {
 		}
 	}
 
-	// Otherwise, start the web server
-	startServer(appInstance)
+	// Otherwise, start the web server (pass cleanup for graceful shutdown)
+	startServer(appInstance, cleanup)
 }
 
-func startServer(appInstance *app.App) {
+func startServer(appInstance *app.App, dbCleanup func()) {
 	// pprof server for profiling
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -120,16 +120,26 @@ func startServer(appInstance *app.App) {
 
 	log.Println("Shutting down gracefully...")
 
-	// Shutdown HTTP server
+	// 1. Shutdown HTTP server (stops accepting new requests)
+	log.Println("Stopping HTTP server...")
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf(ErrorMsgs.Shutdown, err)
 	}
 
-	// Shutdown logger pool (drain pending logs)
+	// 2. Shutdown logger pool (drain pending logs)
 	log.Println("Draining log queue...")
 	if err := loggerPool.Shutdown(shutdownCtx); err != nil {
 		log.Printf("Warning: Logger pool shutdown timeout: %v", err)
 	}
+
+	// 3. Wait for in-flight database operations to complete
+	// srv.Shutdown() already waits for handlers to complete, which includes their DB queries
+	// This ensures all active queries finish before we close the DB
+	log.Println("Waiting for database operations to complete...")
+
+	// 4. Close database connection
+	log.Println("Closing database connection...")
+	dbCleanup()
 
 	log.Println(Colors.Teal + "Graceful shutdown complete." + Colors.Reset)
 }
