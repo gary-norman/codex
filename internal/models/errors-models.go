@@ -44,6 +44,8 @@ type Errors struct {
 	Insert string
 	// KeyValuePair: %v: %v (blue/white pair)
 	KeyValuePair string
+	// LoginSuccess: Succesful login for user %s, expires: %v
+	LoginSuccess string
 	// Login: Unable to login %v called by %v with error: %v
 	Login string
 	// NoRows: No rows returned for %v called by %v with error: %v
@@ -176,6 +178,7 @@ func CreateErrorMessages() *Errors {
 		Insert:       errMsg("Unable to insert", "%v", "%v", "%v"),
 		KeyValuePair: kvMsg("%v", "%v"),
 		Login:        errMsg("Unable to login", "%v", "%v", "%v"),
+		LoginSuccess: errMsg("Successful login for user", "%s", "expires:", "%v"),
 		NoRows:       errMsg("No rows returned for", "%v", "%v", "v"),
 		NotFound:     errMsg("Unable to find", "%v", "%v", "%v"),
 		Open:         errMsg("Unable to open", "%v", "%v", "%v"),
