@@ -10,6 +10,8 @@ type HomePage struct {
 	OwnedChannels          []*Channel
 	JoinedChannels         []*Channel
 	OwnedAndJoinedChannels []*Channel
+	ThisChannel            *Channel // For edit channel rules popover
+	ThisChannelRules       []Rule   // For edit channel rules popover
 	ImagePaths
 }
 
