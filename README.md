@@ -96,17 +96,15 @@
 - **Reactions** - Like and dislike posts and comments to surface quality content
 - **Bookmarks** - Save posts for later reference
 
-#### Moderation & Community Management
-- **Content Flags** - Report inappropriate content for moderator review
-- **Channel Moderation** - Assign moderators to manage specific channels
-- **Channel Rules** - Set and enforce community guidelines per channel
+#### Community Features
+- **Channel Rules** - Set community guidelines per channel
 - **Mute Channels** - Hide channels you're not interested in
 - **Content Filtering** - Filter posts by channel, reactions, and user-created content
 
 #### Media & Design
 - **Image Uploads** - Attach images to posts, channels, and user profiles
 - **Concurrent Image Processing** - Worker pool for background image processing
-- **Responsive Design** - Works seamlessly across desktop and mobile devices
+- **Responsive Design** - 🚧 Work in progress for mobile optimization
 - **Modular CSS Architecture** - Organized stylesheets for maintainability
 
 #### Engagement & Rewards
@@ -159,10 +157,10 @@ Production-ready worker pool for background image processing:
 
 #### Database Patterns
 
-**Generic DAO Layer:**
+**Generic DAO Layer** (🚧 Planned):
 - Type-safe CRUD operations using Go generics: `DAO[T models.DBModel]`
 - Automatic struct-to-SQL mapping via reflection
-- Located in `internal/dao/`
+- Currently using model-specific implementations in `internal/sqlite/`
 
 **Migration System:**
 - Sequential SQL migrations in `migrations/` directory
@@ -198,18 +196,44 @@ Codex uses a modular CSS architecture for maintainability and performance:
 - Better caching (specific module updates)
 - Clear separation of concerns
 
-#### Concurrency Patterns
+#### Concurrency & Fault Tolerance
 
-**Context-Aware Operations:**
-- Database queries with context propagation for cancellation
-- Timeout middleware for HTTP handlers
-- Graceful server shutdown with cleanup
+**Request Tracing:**
+- UUID-based request IDs for distributed tracing
+- Context propagation across middleware and handlers
+- X-Request-ID response headers for client-side debugging
+- Automatic correlation of logs across concurrent operations
 
-**Middleware Stack:**
-- Authentication middleware with session validation
-- Context injection for user data
-- Request timeout protection
-- Logging middleware for request tracking
+**Circuit Breaker Pattern:**
+- Database protection with automatic failure detection
+- Configurable failure threshold (5 failures, 5s timeout)
+- Half-open state for recovery testing
+- Shared circuit state across concurrent goroutines
+- Located in `internal/patterns/circuitbreaker.go`
+
+**Async Logging System:**
+- Worker pool for non-blocking log writes
+- Buffered queue (1000 entries) for high throughput
+- Graceful shutdown with queue draining
+- Database persistence for request logs
+
+**Graceful Shutdown:**
+- Ordered shutdown sequence (HTTP → Logger → Database)
+- Context-based timeout for cleanup operations
+- Wait for in-flight requests before closing connections
+
+**Colorized Logging:**
+- Context-aware logging with request ID injection
+- Color-coded output (🟢 info, 🟠 warn, 🔴 error)
+- Emoji icons for visual scanning
+- Automatic timestamp and formatting
+
+**Key Files:**
+- `internal/http/middleware/tracing.go` - Request ID middleware
+- `internal/patterns/circuitbreaker.go` - Circuit breaker implementation
+- `internal/workers/logger_pool.go` - Async logging worker pool
+- `internal/models/logs-models.go` - Colorized logging functions
+- `cmd/server/main.go` - Graceful shutdown implementation
 
 <!-- Do a search and replace with your text editor for the following: `gary.norman`, `forum`, `twitter_handle`, `linkedin_username`, `email_client`, `email`, `project_title`, `project_description` -->
 
@@ -351,17 +375,28 @@ _For more examples, please refer to the [Documentation](https://example.com)_
 - [x] **UUID-based user identification system**
 - [x] **Modular CSS architecture**
 - [x] **Database migration system**
+- [x] **Request tracing with context propagation**
+- [x] **Circuit breaker pattern for fault tolerance**
+- [x] **Async logging with worker pool**
+- [x] **Graceful shutdown with cleanup**
+- [x] **Colorized logging system**
 - [x] Search functionality
 - [x] Docker deployment
 - [x] Interactive build menu
 
 ### In Progress 🚧
-- [ ] Content moderation (flags, moderators)
+- [ ] Responsive design (mobile optimization)
 - [ ] Error handling improvements (400/500 pages)
 - [ ] Enhanced UI/UX refinements
 - [ ] Image optimization (resizing, thumbnails)
+- [ ] Logging migration (5/10 handlers complete - see LOGGING_MIGRATION.md)
 
 ### Planned 📋
+
+#### Architecture Improvements
+- [ ] Generic DAO layer with Go generics
+- [ ] Type-safe database queries with reflection
+- [ ] Complete logging migration for all handlers
 
 #### Advanced Features
 - [ ] Bookmark system
@@ -377,9 +412,11 @@ _For more examples, please refer to the [Documentation](https://example.com)_
 - [ ] Content sanitization improvements
 
 #### Moderation Tools
+- [ ] Content flags and reporting system
+- [ ] Channel moderation roles
 - [ ] Admin dashboard
 - [ ] Automated content filtering
-- [ ] User reporting system enhancements
+- [ ] User reporting system
 - [ ] Moderator activity logs
 
 #### Authentication
