@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/gary-norman/forum/internal/app"
 	h "github.com/gary-norman/forum/internal/http/handlers"
+	"github.com/gary-norman/forum/internal/http/websocket"
 )
 
 type RouteHandler struct {
@@ -17,7 +18,7 @@ type RouteHandler struct {
 	Session   *h.SessionHandler
 	User      *h.UserHandler
 	Mod       *h.ModHandler
-	Websocket *h.WebsocketHandler
+	Websocket *websocket.Manager
 }
 
 func NewCommentHandler(app *app.App, reaction *h.ReactionHandler) *h.CommentHandler {
@@ -27,16 +28,26 @@ func NewCommentHandler(app *app.App, reaction *h.ReactionHandler) *h.CommentHand
 	}
 }
 
-func NewWebsocketHandler(app *app.App, user *h.UserHandler, post *h.PostHandler, comment *h.CommentHandler, reaction *h.ReactionHandler, channel *h.ChannelHandler, mod *h.ModHandler) *h.WebsocketHandler {
-	return &h.WebsocketHandler{
-		App:      app,
-		User:     user,
-		Post:     post,
-		Comment:  comment,
-		Reaction: reaction,
-		Channel:  channel,
-		Mod:      mod,
-	}
+func NewWebsocketHandler(
+	app *app.App,
+	user *h.UserHandler,
+	post *h.PostHandler,
+	comment *h.CommentHandler,
+	reaction *h.ReactionHandler,
+	channel *h.ChannelHandler,
+	mod *h.ModHandler,
+) *websocket.Manager {
+	ws := websocket.NewManager()
+
+	ws.App = app
+	ws.User = user
+	ws.Post = post
+	ws.Comment = comment
+	ws.Reaction = reaction
+	ws.Channel = channel
+	ws.Mod = mod
+
+	return ws
 }
 
 func NewReactionHandler(app *app.App) *h.ReactionHandler {
