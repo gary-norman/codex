@@ -248,8 +248,10 @@ if (loginForm) {
 
     const usernameInput = document.getElementById("loginFormUser");
     const passwordInput = document.getElementById("loginFormPassword");
+    const ephemeralInput = document.getElementById("login-ephemeral-checkbox");
     const username = usernameInput.value.trim();
     const password = passwordInput.value;
+    const ephemeral = ephemeralInput.checked;
 
     if (!username || !password) {
       showInlineNotification(
@@ -271,12 +273,11 @@ if (loginForm) {
           "Content-Type": "application/json",
           "x-csrf-token": csrfToken,
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, ephemeral }),
         cache: "no-store",
       });
 
       const data = await response.json();
-
       const errorMessages = new Set([
         "incorrect password",
         "user not found",

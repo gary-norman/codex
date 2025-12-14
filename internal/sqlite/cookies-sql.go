@@ -15,10 +15,15 @@ type CookieModel struct {
 	DB *sql.DB
 }
 
-func (m *CookieModel) CreateCookies(w http.ResponseWriter, user *models.User) error {
+func (m *CookieModel) CreateCookies(w http.ResponseWriter, user *models.User, ephemeral bool) (error, time.Time) {
 	sessionToken := models.GenerateToken(32)
 	csrfToken := models.GenerateToken(32)
-	expires := time.Now().Add(24 * time.Hour)
+	var expires time.Time
+	if ephemeral {
+		expires = time.Now().Add(24 * time.Hour)
+	} else {
+		expires = time.Now().AddDate(0, 3, 0)
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
@@ -39,11 +44,11 @@ func (m *CookieModel) CreateCookies(w http.ResponseWriter, user *models.User) er
 		HttpOnly: false,
 	})
 
-	if err := m.UpdateCookies(user, sessionToken, csrfToken); err != nil {
+	if err := m.UpdateCookies(user, sessionToken, csrfToken, expires); err != nil {
 		log.Printf(ErrorMsgs.Cookies, fmt.Sprintf("update user: %v", user.ID), err)
-		return err
+		return err, time.Now()
 	}
-	return nil
+	return nil, expires
 }
 
 func (m *CookieModel) QueryCookies(w http.ResponseWriter, r *http.Request, user *models.User) bool {
@@ -103,8 +108,7 @@ func (m *CookieModel) QueryCookies(w http.ResponseWriter, r *http.Request, user 
 	return success
 }
 
-func (m *CookieModel) UpdateCookies(user *models.User, sessionToken, csrfToken string) error {
-	expires := time.Now().Add(24 * time.Hour)
+func (m *CookieModel) UpdateCookies(user *models.User, sessionToken, csrfToken string, expires time.Time) error {
 	if m == nil || m.DB == nil {
 		fmt.Printf(ErrorMsgs.UserModel, "UpdateCookies", user.Username)
 		return errors.New("UserModel or DB is nil")

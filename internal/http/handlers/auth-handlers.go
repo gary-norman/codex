@@ -149,8 +149,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Parse JSON from the request body
 	var credentials struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
+		Username  string `json:"username"`
+		Password  string `json:"password"`
+		Ephemeral bool   `json:"ephemeral"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&credentials)
 	if err != nil {
@@ -160,6 +161,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	login := credentials.Username
 	password := credentials.Password
+	ephemeral := credentials.Ephemeral
 	fmt.Printf(Colors.Peach+"Attempting login for "+Colors.Text+"%v\n"+Colors.Reset, login)
 	fmt.Println(ErrorMsgs.Divider)
 
@@ -181,9 +183,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if models.CheckPasswordHash(password, user.HashedPassword) {
-		models.LogInfoWithContext(r.Context(), "Successful login for user: %s", user.Username)
 		// Set Session Token and CSRF Token cookies
-		createCookiErr := h.App.Cookies.CreateCookies(w, user)
+		createCookiErr, expires := h.App.Cookies.CreateCookies(w, user, ephemeral)
 		if createCookiErr != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			encErr := json.NewEncoder(w).Encode(map[string]any{
@@ -198,6 +199,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Respond with a successful login message
+		models.LogInfoWithContext(r.Context(), ErrorMsgs.LoginSuccess, user.Username, expires)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		encErr := json.NewEncoder(w).Encode(map[string]any{
