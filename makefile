@@ -112,3 +112,14 @@ backup-scripts: ## backup current scripts before updating
 	@TIMESTAMP=$$(date +%Y%m%d_%H%M%S); \
 		tar -czf scripts/backups/scripts_$$TIMESTAMP.tar.gz scripts/*.sh; \
 		echo "$(GREEN)✓ backup created: $(CODEX_PINK)scripts/backups/scripts_$$TIMESTAMP.tar.gz$(NC)"
+
+fix-line-endings: ## fix Windows (CRLF) line endings to Unix (LF) - for WSL users
+	@echo "$(CODEX_PINK)> fixing line endings...$(NC)"
+	@if command -v dos2unix >/dev/null 2>&1; then \
+		dos2unix Makefile scripts/*.sh 2>/dev/null || true; \
+		echo "$(GREEN)✓ line endings fixed$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠ dos2unix not installed$(NC)"; \
+		echo "$(CODEX_GREEN)Install with:$(NC) $(CODEX_PINK)sudo apt install dos2unix$(NC)"; \
+		echo "$(CODEX_GREEN)Or use sed:$(NC) $(CODEX_PINK)sed -i 's/\r$$//' Makefile scripts/*.sh$(NC)"; \
+	fi

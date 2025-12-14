@@ -13,6 +13,16 @@ HIGHLIGHT="\033[1;30;48;2;166;227;161m"
 CODEX_HIGHLIGHT_GREEN="\033[1;30;48;2;108;207;93m"
 CODEX_HIGHLIGHT_PINK="\033[38;2;20;20;20;48;2;234;79;146m"
 
+# Determine default database paths based on environment
+# WSL detection
+if grep -qi "microsoft\|WSL" /proc/version 2>/dev/null; then
+  DEFAULT_DEV="./identifier.sqlite"
+  DEFAULT_PROD="./production.sqlite"
+else
+  DEFAULT_DEV="/var/lib/db-codex/dev_forum_database.db"
+  DEFAULT_PROD="/var/lib/db-codex/forum_database.db"
+fi
+
 printf "${RED}> resetting configuration...${NC}\n"
 rm -f .env
 
@@ -27,16 +37,16 @@ DB_PATH=""
 case $SELECTION in
 1)
   echo "DB_ENV=dev" >>.env
-  DB_PATH="/var/lib/db-codex/dev_forum_database.db"
+  DB_PATH=$DEFAULT_DEV
   ;;
 2)
   echo "DB_ENV=prod" >>.env
-  DB_PATH="/var/lib/db-codex/forum_database.db"
+  DB_PATH=$DEFAULT_PROD
   ;;
 *)
   printf "${RED}✗ invalid selection, defaulting to development${NC}\n"
   echo "DB_ENV=dev" >>.env
-  DB_PATH="/var/lib/db-codex/dev_forum_database.db"
+  DB_PATH=$DEFAULT_DEV
   ;;
 esac
 

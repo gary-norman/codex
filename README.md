@@ -269,6 +269,10 @@ Codex uses a modular CSS architecture for maintainability and performance:
 
 * Go 1.22 or higher
 * SQLite3
+* **WSL users only**: `dos2unix` package (for fixing line endings)
+  ```sh
+  sudo apt install dos2unix
+  ```
 
 ### Installation
 
@@ -277,6 +281,39 @@ Codex uses a modular CSS architecture for maintainability and performance:
    git clone https://github.com/gary-norman/forum.git
    cd forum
    ```
+
+2. Set up environment configuration
+   ```sh
+   cp .env.example .env
+   # Edit .env and configure DB_PATH for your environment
+   # - Local development: ./identifier.sqlite
+   # - WSL: ./identifier.sqlite or /tmp/codex_dev.db
+   # - Production with FUSE: /var/lib/db-codex/database.db (ext4)
+   ```
+
+> **Note for FUSE filesystems**: If your application code is on a FUSE filesystem (network mount, cloud storage), place the database on a native filesystem like ext4 at `/var/lib/`. FUSE filesystems don't properly support SQLite's file locking mechanisms.
+
+#### WSL-Specific Setup
+
+If you're using Windows Subsystem for Linux (WSL), you may encounter line ending issues. Fix them with:
+
+```sh
+# Option 1: Use the Make target (recommended)
+make fix-line-endings
+
+# Option 2: Manual fix with dos2unix
+dos2unix Makefile scripts/*.sh
+
+# Option 3: Manual fix with sed (if dos2unix not available)
+sed -i 's/\r$//' Makefile scripts/*.sh
+```
+
+Then run the configuration:
+```sh
+make configure  # Will auto-detect WSL and use appropriate paths
+```
+
+> **Why this is needed**: Git may check out files with Windows (CRLF) line endings on WSL, which breaks shell scripts and Makefiles. The `.gitattributes` file prevents this for new clones, but existing repositories may need manual fixing.
 
 ### Usage
 

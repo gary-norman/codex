@@ -235,7 +235,8 @@ func (u *UserHandler) EditUserDetails(w http.ResponseWriter, r *http.Request) {
 	if editErr != nil {
 		log.Printf(ErrorMsgs.Edit, user.Username, "EditUserDetails", editErr)
 	}
-	if err := u.App.Cookies.CreateCookies(w, user); err != nil {
+	ephemeral := true
+	if err, _ := u.App.Cookies.CreateCookies(w, user, ephemeral); err != nil {
 		log.Printf(ErrorMsgs.KeyValuePair, "error creating cookies", err)
 	}
 	http.Redirect(w, r, "/", http.StatusFound)

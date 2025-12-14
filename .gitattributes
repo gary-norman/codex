@@ -1,0 +1,21 @@
+# Enforce Unix line endings for shell scripts and Makefiles
+# This prevents CRLF issues on WSL and Linux
+
+# Shell scripts always use LF
+*.sh text eol=lf
+
+# Makefile always uses LF
+Makefile text eol=lf
+makefile text eol=lf
+
+# Go source files
+*.go text eol=lf
+
+# SQL files
+*.sql text eol=lf
+
+# Markdown and documentation
+*.md text eol=lf
+
+# Default for text files: let Git decide, but normalize to LF on checkin
+* text=auto eol=lf
