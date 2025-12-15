@@ -35,6 +35,28 @@ func NewManager() *Manager {
 	return m
 }
 
+func (ws *Manager) ServeWebsocket(w http.ResponseWriter, r *http.Request) {
+	var upgrader = websocket.Upgrader{
+		CheckOrigin:     checkOrigin,
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
+
+	// Upgrade the HTTP connection to a websocket connection
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	client := NewClient(conn, ws)
+
+	ws.addClient(client)
+
+	//Start client processes
+	go client.readMessages()
+	go client.writeMessages()
+}
+
 func (ws *Manager) routeEvent(event Event, c *Client) error {
 	if handler, ok := ws.EventHandlers[event.Type]; ok {
 		if err := handler(event, c); err != nil {
@@ -54,30 +76,6 @@ func (ws *Manager) setupEventHandlers() {
 func SendMessage(event Event, c *Client) error {
 	fmt.Println(event)
 	return nil
-}
-
-func (ws *Manager) ServeWebsocket(w http.ResponseWriter, r *http.Request) {
-	var upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
-	}
-
-	// Upgrade the HTTP connection to a websocket connection
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	client := NewClient(conn, ws)
-
-	ws.addClient(client)
-
-	//Start client processes
-	go client.readMessages()
-	go client.writeMessages()
 }
 
 func (ws *Manager) addClient(client *Client) {
@@ -100,5 +98,18 @@ func (ws *Manager) removeClient(client *Client) {
 			log.Printf("Error closing WebSocket connection: %v", err)
 		}
 		delete(ws.Clients, client)
+	}
+}
+
+// function to check the origin of the websocket connection; for security
+func checkOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+
+	switch origin {
+	case "http://localhost:8888":
+		return true
+	default:
+		log.Println("Origin not allowed")
+		return false
 	}
 }
