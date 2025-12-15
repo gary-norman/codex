@@ -6,9 +6,11 @@ import (
 	"github.com/gary-norman/forum/internal/app"
 	"github.com/gary-norman/forum/internal/http/handlers"
 	"github.com/gorilla/websocket"
+	"golang.org/x/net/context"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type Manager struct {
@@ -22,14 +24,16 @@ type Manager struct {
 	Clients       ClientList
 	sync.RWMutex  //read/write lock in Go. It protects shared data when multiple goroutines access it, allowing many readers at the same time but only one writer at a time.
 	EventHandlers map[string]EventHandler
+	OTPs          RetentionMap
 	// Notification *NotificationHandler
 	// Membership *MembershipHandler
 }
 
-func NewManager() *Manager {
+func NewManager(ctx context.Context) *Manager {
 	m := &Manager{
 		Clients:       make(ClientList), //creates a client list whenever a new manager is created so no nil pointer exception
 		EventHandlers: make(map[string]EventHandler),
+		OTPs:          NewRetentionMap(ctx, 5*time.Second),
 	}
 	m.setupEventHandlers()
 	return m
