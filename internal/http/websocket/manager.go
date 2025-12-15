@@ -3,8 +3,6 @@ package websocket
 import (
 	"errors"
 	"fmt"
-	"github.com/gary-norman/forum/internal/app"
-	"github.com/gary-norman/forum/internal/http/handlers"
 	"github.com/gorilla/websocket"
 	"golang.org/x/net/context"
 	"log"
@@ -14,19 +12,10 @@ import (
 )
 
 type Manager struct {
-	App           *app.App
-	User          *handlers.UserHandler
-	Post          *handlers.PostHandler
-	Comment       *handlers.CommentHandler
-	Reaction      *handlers.ReactionHandler
-	Channel       *handlers.ChannelHandler
-	Mod           *handlers.ModHandler
 	Clients       ClientList
 	sync.RWMutex  //read/write lock in Go. It protects shared data when multiple goroutines access it, allowing many readers at the same time but only one writer at a time.
 	EventHandlers map[string]EventHandler
 	OTPs          RetentionMap
-	// Notification *NotificationHandler
-	// Membership *MembershipHandler
 }
 
 func NewManager(ctx context.Context) *Manager {
