@@ -4,6 +4,12 @@ import (
 	"encoding/json"
 	"github.com/gorilla/websocket"
 	"log"
+	"time"
+)
+
+var (
+	pongWait     = 10 * time.Second
+	pingInterval = (pongWait * 9) / 10
 )
 
 type ClientList map[*Client]bool
@@ -28,6 +34,13 @@ func (c *Client) readMessages() {
 		//cleanup connection
 		c.manager.removeClient(c)
 	}()
+
+	if err := c.connection.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		log.Println("Error setting read deadline:", err)
+		return
+	}
+
+	c.connection.SetPongHandler(c.pongHandler)
 
 	//continuously read messages from the connection
 	for {
@@ -64,6 +77,8 @@ func (c *Client) writeMessages() {
 		c.manager.removeClient(c)
 	}()
 
+	ticker := time.NewTicker(pingInterval)
+
 	for {
 		select {
 		//When messages are sent, we will write them to egress channel, which will one by one, select them and fire them onto the websocket connection
@@ -87,6 +102,19 @@ func (c *Client) writeMessages() {
 			}
 			log.Println("message sent")
 
+		case <-ticker.C:
+			log.Println("ping")
+
+			//Send a ping to the client
+			if err := c.connection.WriteMessage(websocket.PingMessage, []byte(``)); err != nil {
+				log.Println("Error writing ping:", err)
+				return
+			}
 		}
 	}
+}
+
+func (c *Client) pongHandler(pongMsg string) error {
+	log.Println("pong")
+	return c.connection.SetReadDeadline(time.Now().Add(pongWait))
 }
