@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	mw "github.com/gary-norman/forum/internal/http/middleware"
 	"log"
 	"net/http"
 	"regexp"
@@ -145,6 +146,24 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (h *AuthHandler) GetWebsocketOTP(w http.ResponseWriter, r *http.Request) {
+	// Verify user is authenticated
+	_, ok := mw.GetUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Generate OTP
+	otp := h.App.Websocket.OTPs.NewOTP()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]any{
+		"otp": otp,
+	})
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
