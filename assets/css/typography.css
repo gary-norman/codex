@@ -83,8 +83,16 @@ a:active,
   /*color: inherit;*/
 }
 
-.link:hover {
+.link:not(:has(.card-child)):hover {
   color: var(--clr-accent--1-light-1);
+}
+
+.link:not(:has(.card-child:hover)):has(.card-child):hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.card-pic.link:hover {
+  border: 3px solid var(--clr-accent--base-1);
 }
 
 .link-under {

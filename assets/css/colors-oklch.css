@@ -1,127 +1,129 @@
 :root {
-  /* ----  base accent colours ---- */
-  --clr-accent--pink: lab(57.24 64.92 -3.64);
-  --clr-accent--green: lab(78.47 -39.34 34.94);
-  --clr-accent--blue: lab(62.35 -4.66 -32.56);
-  --clr-accent--orange: lab(62.29 34.31 54.48);
-  --clr-accent--yellow: lab(84.51 5.57 76.51);
-  --clr-accent--red: lab(51.65 83.45 51.15);
-  --clr--error: lab(64.5 81.87 50.88);
-  --clr--warn: lab(74.45 23.19 68.49);
+      /* ----  base accent colours ---- */
+      --clr-accent--pink: lab(57.24 64.92 -3.64);
+      --clr-accent--green: lab(78.47 -39.34 34.94);
+      --clr-accent--blue: lab(62.35 -4.66 -32.56);
+      --clr-accent--orange: lab(62.29 34.31 54.48);
+      --clr-accent--yellow: lab(84.51 5.57 76.51);
+      --clr-accent--red: lab(51.65 83.45 51.15);
+      --clr--error: lab(64.5 81.87 50.88);
+      --clr--warn: lab(74.45 23.19 68.49);
 
-  /* ---- golang gopher colours ---- */
-  --clr-golang--blue: lab(65.63 -21.79 -32.08);
-  --clr-golang--beige: lab(86.21 9.49 26.04);
+      /* ---- golang gopher colours ---- */
+      --clr-golang--blue: lab(65.63 -21.79 -32.08);
+      --clr-golang--beige: lab(86.21 9.49 26.04);
 
-  /* ---- multiplier ratios ---- */
-  --clr-dark--multi: 0.1;
-  --clr-light--multi: 0.085;
-  --clr-accent--multi: 0.1;
+      /* ---- multiplier ratios ---- */
+      --clr-dark--multi: 0.1;
+      --clr-light--multi: 0.085;
+      --clr-accent--multi: 0.1;
 
-  /* ---- dark colours ---- */
-  --clr-dark--1: lab(16.86% -0.44 -3.85);
-  --clr-dark--2: lab(20.62% -1.85 -4.38);
-  --clr-dark--3: lab(31.92% -0.99 -6.4);
-  --clr-dark--4: lab(38.26% -0.87 -7.48);
-  --clr-dark--5: lab(49.4% -0.59 -3.94);
-  --clr-dark--6: lab(65.26% -4.31 -3.26);
+      /* ---- dark colours ---- */
+      --clr-dark--1: lab(16.86% -0.44 -3.85);
+      --clr-dark--2: lab(20.62% -1.85 -4.38);
+      --clr-dark--3: lab(31.92% -0.99 -6.4);
+      --clr-dark--4: lab(38.26% -0.87 -7.48);
+      --clr-dark--5: lab(49.4% -0.59 -3.94);
+      --clr-dark--6: lab(65.26% -4.31 -3.26);
 
-  /* ---- light colours (calculated from dark colours) ---- */
-  --clr-light--1: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 8)) c h);
-  --clr-light--2: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 6)) c h);
-  --clr-light--3: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 4)) c h);
-  --clr-light--4: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 3)) c h);
-  --clr-light--5: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 2)) c h);
-  --clr-light--6: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 1)) c h);
+      /* ---- light colours (calculated from dark colours) ---- */
+      --clr-light--1: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 8)) c h);
+      --clr-light--2: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 6)) c h);
+      --clr-light--3: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 4)) c h);
+      --clr-light--4: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 3)) c h);
+      --clr-light--5: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 2)) c h);
+      --clr-light--6: oklch(from var(--clr-dark--1) calc(l + calc(var(--clr-light--multi) * 1)) c h);
 
-  /* ---- primary accent colour (blue in light mode, green in dark mode) ---- */
-  --clr-accent--base-1: light-dark(var(--clr-accent--blue),
-      var(--clr-accent--green));
+      /* ---- primary accent colour (blue in light mode, green in dark mode) ---- */
+      --clr-accent--base-1: light-dark(var(--clr-accent--blue),
+                  var(--clr-accent--green));
+      --clr-accent--base-1-semi: oklch(from var(--clr-accent--base-1) l c h / 60%);
 
-  --clr-accent--1-light-3: oklch(from var(--clr-accent--base-1) calc(l + calc(var(--clr-accent--multi) * 3)) c h);
-  --clr-accent--1-light-2: oklch(from var(--clr-accent--base-1) calc(l + calc(var(--clr-accent--multi) * 2)) c h);
-  --clr-accent--1-light-1: oklch(from var(--clr-accent--base-1) calc(l + calc(var(--clr-accent--multi) * 1)) c h);
-  --clr-accent--1: var(--clr-accent--base-1);
-  --clr-accent--1-faded: oklch(from var(--clr-accent--1) calc(l * 1.95) calc(c * 1.9) h / 50%);
-  --clr-accent--1-bg: color-mix(in lab,
-      var(--clr-accent--1) 30%,
-      var(--clr-bg-1));
-  --clr-accent--1-dark-1: oklch(from var(--clr-accent--base-1) calc(l - calc(var(--clr-accent--multi) * 1)) c h);
-  --clr-accent--1-dark-2: oklch(from var(--clr-accent--base-1) calc(l - calc(var(--clr-accent--multi) * 2)) c h);
-  --clr-accent--1-dark-3: oklch(from var(--clr-accent--base-1) calc(l - calc(var(--clr-accent--multi) * 3)) c h);
-  --clr-accent--1-contrast: oklch(from var(--clr-accent--base-1) calc(l + 0.6) c h);
-  --clr-accent--1-complement: oklch(from var(--clr-accent--base-1) l c calc(h + 180deg));
+      --clr-accent--1-light-3: oklch(from var(--clr-accent--base-1) calc(l + calc(var(--clr-accent--multi) * 3)) c h);
+      --clr-accent--1-light-2: oklch(from var(--clr-accent--base-1) calc(l + calc(var(--clr-accent--multi) * 2)) c h);
+      --clr-accent--1-light-1: oklch(from var(--clr-accent--base-1) calc(l + calc(var(--clr-accent--multi) * 1)) c h);
+      --clr-accent--1: var(--clr-accent--base-1);
+      --clr-accent--1-faded: oklch(from var(--clr-accent--1) calc(l * 1.95) calc(c * 1.9) h / 50%);
+      --clr-accent--1-bg: color-mix(in lab,
+                  var(--clr-accent--1) 30%,
+                  var(--clr-bg-1));
+      --clr-accent--1-dark-1: oklch(from var(--clr-accent--base-1) calc(l - calc(var(--clr-accent--multi) * 1)) c h);
+      --clr-accent--1-dark-2: oklch(from var(--clr-accent--base-1) calc(l - calc(var(--clr-accent--multi) * 2)) c h);
+      --clr-accent--1-dark-3: oklch(from var(--clr-accent--base-1) calc(l - calc(var(--clr-accent--multi) * 3)) c h);
+      --clr-accent--1-contrast: oklch(from var(--clr-accent--base-1) calc(l + 0.6) c h);
+      --clr-accent--1-complement: oklch(from var(--clr-accent--base-1) l c calc(h + 180deg));
 
-  --clr-accent--base-2: var(--clr-accent--pink);
+      --clr-accent--base-2: var(--clr-accent--pink);
+      --clr-accent--base-2-semi: oklch(from var(--clr-accent--base-2) l c h / 60%);
 
-  --clr-accent--2-light-3: oklch(from var(--clr-accent--base-2) calc(l + calc(var(--clr-accent--multi) * 3)) c h);
-  --clr-accent--2-light-2: oklch(from var(--clr-accent--base-2) calc(l + calc(var(--clr-accent--multi) * 2)) c h);
-  --clr-accent--2-light-1: oklch(from var(--clr-accent--base-2) calc(l + calc(var(--clr-accent--multi) * 1)) c h);
-  --clr-accent--2: var(--clr-accent--base-2);
-  --clr-accent--2-faded: oklch(from var(--clr-accent--2) calc(l * 1.95) calc(c * 1.9) h / 10%);
-  --clr-accent--2-bg: color-mix(in lab,
-      var(--clr-accent--2) 30%,
-      var(--clr-bg-1));
-  --clr-accent--2-dark-1: oklch(from var(--clr-accent--base-2) calc(l - calc(var(--clr-accent--multi) * 1)) c h);
-  --clr-accent--2-dark-2: oklch(from var(--clr-accent--base-2) calc(l - calc(var(--clr-accent--multi) * 2)) c h);
-  --clr-accent--2-dark-3: oklch(from var(--clr-accent--base-2) calc(l - calc(var(--clr-accent--multi) * 3)) c h);
-  --clr-accent--2-contrast: oklch(from var(--clr-accent--base-2) calc(l + 0.6) c h);
-  --clr-accent--2-complement: oklch(from var(--clr-accent--base-2) l c calc(h + 180deg));
+      --clr-accent--2-light-3: oklch(from var(--clr-accent--base-2) calc(l + calc(var(--clr-accent--multi) * 3)) c h);
+      --clr-accent--2-light-2: oklch(from var(--clr-accent--base-2) calc(l + calc(var(--clr-accent--multi) * 2)) c h);
+      --clr-accent--2-light-1: oklch(from var(--clr-accent--base-2) calc(l + calc(var(--clr-accent--multi) * 1)) c h);
+      --clr-accent--2: var(--clr-accent--base-2);
+      --clr-accent--2-faded: oklch(from var(--clr-accent--2) calc(l * 1.95) calc(c * 1.9) h / 10%);
+      --clr-accent--2-bg: color-mix(in lab,
+                  var(--clr-accent--2) 30%,
+                  var(--clr-bg-1));
+      --clr-accent--2-dark-1: oklch(from var(--clr-accent--base-2) calc(l - calc(var(--clr-accent--multi) * 1)) c h);
+      --clr-accent--2-dark-2: oklch(from var(--clr-accent--base-2) calc(l - calc(var(--clr-accent--multi) * 2)) c h);
+      --clr-accent--2-dark-3: oklch(from var(--clr-accent--base-2) calc(l - calc(var(--clr-accent--multi) * 3)) c h);
+      --clr-accent--2-contrast: oklch(from var(--clr-accent--base-2) calc(l + 0.6) c h);
+      --clr-accent--2-complement: oklch(from var(--clr-accent--base-2) l c calc(h + 180deg));
 
-  --clr-bg-1: light-dark(var(--clr-light--1), var(--clr-dark--1));
-  --clr-bg-2: light-dark(var(--clr-light--2), var(--clr-dark--2));
-  --clr-bg-3: light-dark(var(--clr-light--3), var(--clr-dark--3));
-  --clr-bg-4: light-dark(var(--clr-light--4), var(--clr-dark--4));
-  --clr-bg-5: light-dark(var(--clr-light--5), var(--clr-dark--5));
-  --clr-bg-6: light-dark(var(--clr-light--6), var(--clr-dark--6));
+      --clr-bg-1: light-dark(var(--clr-light--1), var(--clr-dark--1));
+      --clr-bg-2: light-dark(var(--clr-light--2), var(--clr-dark--2));
+      --clr-bg-3: light-dark(var(--clr-light--3), var(--clr-dark--3));
+      --clr-bg-4: light-dark(var(--clr-light--4), var(--clr-dark--4));
+      --clr-bg-5: light-dark(var(--clr-light--5), var(--clr-dark--5));
+      --clr-bg-6: light-dark(var(--clr-light--6), var(--clr-dark--6));
 
-  --clr-fg-1: light-dark(var(--clr-dark--1), var(--clr-light--1));
-  --clr-fg-2: light-dark(var(--clr-dark--2), var(--clr-light--2));
-  --clr-fg-3: light-dark(var(--clr-dark--3), var(--clr-light--3));
-  --clr-fg-4: light-dark(var(--clr-dark--4), var(--clr-light--4));
-  --clr-fg-5: light-dark(var(--clr-dark--5), var(--clr-light--5));
-  --clr-fg-6: light-dark(var(--clr-dark--6), var(--clr-light--6));
+      --clr-fg-1: light-dark(var(--clr-dark--1), var(--clr-light--1));
+      --clr-fg-2: light-dark(var(--clr-dark--2), var(--clr-light--2));
+      --clr-fg-3: light-dark(var(--clr-dark--3), var(--clr-light--3));
+      --clr-fg-4: light-dark(var(--clr-dark--4), var(--clr-light--4));
+      --clr-fg-5: light-dark(var(--clr-dark--5), var(--clr-light--5));
+      --clr-fg-6: light-dark(var(--clr-dark--6), var(--clr-light--6));
 
-  /* --- buttons etc --- */
-  --clr-hl-primary: var(--clr-accent--1);
-  --clr-secondary--active: var(--clr-bg-2);
-  --clr-secondary--hover: var(--clr-bg-4);
-  --clr-secondary--border: var(--clr-bg-5);
-  --clr-secondary--border-hover: var(--clr-fg-3);
+      /* --- buttons etc --- */
+      --clr-hl-primary: var(--clr-accent--1);
+      --clr-secondary--active: var(--clr-bg-2);
+      --clr-secondary--hover: var(--clr-bg-4);
+      --clr-secondary--border: var(--clr-bg-5);
+      --clr-secondary--border-hover: var(--clr-fg-3);
 }
 
 .mode-dark {
-  --clr-bg-1: var(--clr-dark--1);
-  --clr-bg-2: var(--clr-dark--2);
-  --clr-bg-3: var(--clr-dark--3);
-  --clr-bg-4: var(--clr-dark--4);
-  --clr-bg-5: var(--clr-dark--5);
-  --clr-bg-6: var(--clr-dark--6);
+      --clr-bg-1: var(--clr-dark--1);
+      --clr-bg-2: var(--clr-dark--2);
+      --clr-bg-3: var(--clr-dark--3);
+      --clr-bg-4: var(--clr-dark--4);
+      --clr-bg-5: var(--clr-dark--5);
+      --clr-bg-6: var(--clr-dark--6);
 
-  --clr-fg-1: var(--clr-light--1);
-  --clr-fg-2: var(--clr-light--2);
-  --clr-fg-3: var(--clr-light--3);
-  --clr-fg-4: var(--clr-light--4);
-  --clr-fg-5: var(--clr-light--5);
-  --clr-fg-6: var(--clr-light--6);
+      --clr-fg-1: var(--clr-light--1);
+      --clr-fg-2: var(--clr-light--2);
+      --clr-fg-3: var(--clr-light--3);
+      --clr-fg-4: var(--clr-light--4);
+      --clr-fg-5: var(--clr-light--5);
+      --clr-fg-6: var(--clr-light--6);
 
-  --clr-accent--base-1: var(--clr-accent--green);
+      --clr-accent--base-1: var(--clr-accent--green);
 }
 
 .mode-light {
-  --clr-bg-1: var(--clr-light--1);
-  --clr-bg-2: var(--clr-light--2);
-  --clr-bg-3: var(--clr-light--3);
-  --clr-bg-4: var(--clr-light--4);
-  --clr-bg-5: var(--clr-light--5);
-  --clr-bg-6: var(--clr-light--6);
+      --clr-bg-1: var(--clr-light--1);
+      --clr-bg-2: var(--clr-light--2);
+      --clr-bg-3: var(--clr-light--3);
+      --clr-bg-4: var(--clr-light--4);
+      --clr-bg-5: var(--clr-light--5);
+      --clr-bg-6: var(--clr-light--6);
 
-  --clr-fg-1: var(--clr-dark--1);
-  --clr-fg-2: var(--clr-dark--2);
-  --clr-fg-3: var(--clr-dark--3);
-  --clr-fg-4: var(--clr-dark--4);
-  --clr-fg-5: var(--clr-dark--5);
-  --clr-fg-6: var(--clr-dark--6);
+      --clr-fg-1: var(--clr-dark--1);
+      --clr-fg-2: var(--clr-dark--2);
+      --clr-fg-3: var(--clr-dark--3);
+      --clr-fg-4: var(--clr-dark--4);
+      --clr-fg-5: var(--clr-dark--5);
+      --clr-fg-6: var(--clr-dark--6);
 
-  --clr-accent--base-1: var(--clr-accent--blue);
+      --clr-accent--base-1: var(--clr-accent--blue);
 }

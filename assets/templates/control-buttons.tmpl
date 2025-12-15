@@ -18,6 +18,7 @@
 {{ end }}
     <div class="
       button-row-wrap
+      {{ if eq $calledBy "post-card" }} card-child{{ end }}
       {{ if ne $calledBy "right-panel"}} post-controls{{end}}
     "
     {{ if eq $calledBy "post-card" }}
@@ -32,39 +33,39 @@
       {{ if eq $calledBy "post-card"}}
         {{ $post := .Post }}
         {{$status := reactionStatus $userID $post.ID 0}}
-        <button class="btn-md btn-secondary btn-icotext btn-filled btn-action {{ if eq $nouser true}}nouser{{ else }}{{if $status.Liked}}active{{ else }} {{end}} {{ end }}">
+        <button class="btn-md btn-secondary btn-icotext btn-filled btn-action card-child {{ if eq $nouser true}}nouser{{ else }}{{if $status.Liked}}active{{ else }} {{end}} {{ end }}">
           <span class="btn-likes">{{$post.Likes}}</span>
         </button>
-        <button class="btn-md btn-secondary btn-icotext btn-filled btn-action {{ if eq $nouser true}}nouser{{ else }}{{if $status.Disliked}}active{{ else }} {{end}} {{ end }}" >
+        <button class="btn-md btn-secondary btn-icotext btn-filled btn-action card-child {{ if eq $nouser true}}nouser{{ else }}{{if $status.Disliked}}active{{ else }} {{end}} {{ end }}" >
           <span class="btn-dislikes">{{$post.Dislikes}}</span>
         </button>
         {{ if eq $thisPost "true" }}
 {{/* the detailed post */}}
 {{ if eq $post.IsCommentable true}}
-          <button id="reply-button-channel-{{$post.ChannelID}}-post-{{$post.ID}}-{{$instance}}" class="btn-md btn-secondary btn-icotext btn-filled btn-action {{ if eq $nouser true}}nouser{{end}}" data-action="comment-post" data-post-id="{{$post.ID}}">
+        <button id="reply-button-channel-{{$post.ChannelID}}-post-{{$post.ID}}-{{$instance}}" class="btn-md btn-secondary btn-icotext btn-filled btn-action card-child {{ if eq $nouser true}}nouser{{end}}" data-action="comment-post" data-post-id="{{$post.ID}}">
             <span class="btn-reply">reply</span>
           </button>
           {{ end }}
         {{ else }}
 {{/* posts on any list */}}
 {{ if eq $post.IsCommentable true}}
-          <button class="btn-md btn-secondary btn-icotext btn-filled btn-action {{ if eq $nouser true}}nouser{{end}}" data-dest="post" data-action="{{ if ne $nouser true}}navigate--{{ end }}comment-post" data-post-id="{{$post.ID}}">
+          <button class="btn-md btn-secondary btn-icotext btn-filled btn-action card-child {{ if eq $nouser true}}nouser{{end}}" data-dest="post" data-action="{{ if ne $nouser true}}navigate--{{ end }}comment-post" data-post-id="{{$post.ID}}">
             <span class="btn-reply">{{$post.CommentsCount}}</span>
           </button>
           {{ end }}
         {{ end }}
-        <button id="share-button-channel-{{$post.ChannelID}}-post-{{$post.ID}}-{{$instance}}" popovertarget="share-container-channel-{{$post.ChannelID}}-post-{{$post.ID}}-{{$instance}}" class="btn-md btn-secondary btn-icotext btn-filled btn-action">
+        <button id="share-button-channel-{{$post.ChannelID}}-post-{{$post.ID}}-{{$instance}}" popovertarget="share-container-channel-{{$post.ChannelID}}-post-{{$post.ID}}-{{$instance}}" class="btn-md btn-secondary btn-icotext btn-filled btn-action card-child">
           <span class="btn-share">share</span>
         </button>
         {{ if ne $nouser true}}
             {{ if ne $userID $post.AuthorID}}
-                <button class="btn-md btn-secondary btn-icotext btn-filled btn-action" >
+                <button class="btn-md btn-secondary btn-icotext btn-filled btn-action card-child" >
                     <span class="btn-report">report</span>
                 </button>
             {{ end}}
 
             {{ if eq $userID $post.AuthorID}}
-            <button class="btn-md btn-secondary btn-icotext btn-filled btn-action" >
+            <button class="btn-md btn-secondary btn-icotext btn-filled btn-action card-child" >
               <span class="btn-edit">edit</span>
             </button>
           {{ end}}
@@ -112,14 +113,14 @@
       {{ if ne $nouser true }}
 {{/* TODO when user is an administrator, button prepared; needs admin check*/}}
         {{if eq $instance "user-page"}}
-          {{/*        <button class="btn-md btn-secondary btn-icotext btn-filled btn-action" >*/}}
+          {{/*        <button class="btn-md btn-secondary btn-icotext btn-filled btn-action card-child" >*/}}
           {{/*          <span class="btn-ban">ban</span>*/}}
           {{/*        </button>*/}}
           {{ else if eq $instance "channel-page"}}
-          <button class="btn-md btn-secondary btn-icotext btn-filled btn-action">
+          <button class="btn-md btn-secondary btn-icotext btn-filled btn-action card-child">
             <span class="btn-mute">mute</span>
           </button>
-          <button class="btn-md btn-secondary btn-icotext btn-filled btn-action" >
+          <button class="btn-md btn-secondary btn-icotext btn-filled btn-action card-child" >
             <span class="btn-report">report</span>
           </button>
         {{ end }} {{/* end of if "user-page" or "channel-page" */}}

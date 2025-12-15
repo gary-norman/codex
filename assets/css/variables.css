@@ -43,6 +43,7 @@
   --shadow-filter: 0 0.4rem 2.4rem rgba(0 0 0 / 0.4);
   /* INFO this shadow is unused */
   --shadow-card: 0px 8px 24px 0px rgba(0, 0, 0, 0.6);
+  --shadow-card-hover: 0px 8px 24px 0px var(--clr-accent--base-1-semi);
   --shadow-text: 0.1rem 0.1rem 0.1rem rgba(0, 0, 0, 0.2);
   /* INFO this shadow is unused */
   --shadow-icon:

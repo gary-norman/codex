@@ -24,23 +24,14 @@
        data-last-reaction="{{$post.LastReaction}}">
     <div class="container-post-info">
       {{ if (startsWith $post.AuthorAvatar "noimage") }}
-        {{/*        FIXME base audit - removed links and data-dests for user-page being commented out*/}}
-        <span class="card-pic profile-pic--empty{{/*        link*/}}"
-{{/*              data-dest="user" */}}
-              data-name-user="{{ $post.Author }}" data-user-id="{{ $post.AuthorID }}"></span>
+        <span class="card-pic profile-pic--empty card-child link" data-dest="user" data-name-user="{{ $post.Author }}" data-user-id="{{ $post.AuthorID }}"></span>
       {{ else }}
-        <span class="card-pic profile-pic{{/*        link*/}}"
-{{/*              data-dest="user" */}}
-              data-image-user="{{ $dot.ImagePaths.User }}{{ $post.AuthorAvatar }}" data-user-id="{{ $post.AuthorID }}" role="presentation"></span>
+        <span class="card-pic profile-pic card-child link" data-dest="user" data-image-user="{{ $dot.ImagePaths.User }}{{ $post.AuthorAvatar }}" data-user-id="{{ $post.AuthorID }}" role="presentation"></span>
       {{ end }}
       <div>
-        <small id="link-post-user-{{ $post.AuthorID }}-{{$instance}}"
-{{/*               data-dest="user"*/}}
-               data-user-id="{{ $post.AuthorID }}" class="small-bold
-{{/*               link*/}}
-">{{ $post.Author }}</small>
+        <small id="link-post-user-{{ $post.AuthorID }}-{{$instance}}" data-dest="user" data-user-id="{{ $post.AuthorID }}" class="small-bold card-child link">{{ $post.Author }}</small>
         <div>
-          <small id="link-post-channelID-{{ $post.ChannelID }}-{{ $instance }}" data-dest="channel" class="link" data-channel-id="{{ $post.ChannelID }}">{{ $post.ChannelName }}</small>
+          <small id="link-post-channelID-{{ $post.ChannelID }}-{{ $instance }}" data-dest="channel" class="card-child link" data-channel-id="{{ $post.ChannelID }}">{{ $post.ChannelName }}</small>
           <small>-</small>
           <small>{{$post.TimeSince}}</small>
         </div>
@@ -49,7 +40,7 @@
         <button data-tooltip-name="like" aria-label="like button" class="btn-icoonly"></button>
       </div>
     </div>
-    <h4 id="link-post-post-{{ $post.ID }}-{{ .Instance }}">{{$post.Title}}</h4>
+    <h4 id="link-post-post-{{ $post.ID }}-{{ .Instance }}" class="link">{{$post.Title}}</h4>
     {{ if ne $post.Images "noimage" }}
     <img src="{{ $dot.ImagePaths.Post }}{{ $post.Images }}" class="post-image" alt="Image for {{ $post.Title }}">
     {{ end }}

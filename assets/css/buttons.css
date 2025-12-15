@@ -53,6 +53,7 @@ button,
 
 .button-row-wrap {
   flex-wrap: wrap;
+  inline-size: fit-content;
 }
 
 .btn-pill {
