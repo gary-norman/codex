@@ -198,12 +198,17 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
+
+		//adding OTP to a logged-in user for websocket authentication
+		otp := h.App.Websocket.OTPs.NewOTP()
+
 		// Respond with a successful login message
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		encErr := json.NewEncoder(w).Encode(map[string]any{
 			"code":    http.StatusOK,
 			"message": fmt.Sprintf("Welcome, %s! Login successful.", user.Username),
+			"otp":     otp.Key,
 		})
 		if encErr != nil {
 			log.Printf(ErrorMsgs.Encode, "login: success", encErr)
