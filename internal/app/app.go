@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
+	"github.com/gary-norman/forum/internal/http/websocket"
 	"log"
 	"os"
 	"strings"
@@ -100,6 +101,7 @@ type App struct {
 	Cookies     *sqlite.CookieModel
 	Rules       *sqlite.RuleModel
 	Paths       models.ImagePaths
+	Websocket   *websocket.Manager
 }
 
 func NewApp(db *sql.DB, imagePath string) *App {
