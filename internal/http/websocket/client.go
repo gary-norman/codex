@@ -40,6 +40,9 @@ func (c *Client) readMessages() {
 		return
 	}
 
+	//set a limit in bytes to allow only a certain amount of text sent through to stop DoS attacks
+	c.connection.SetReadLimit(512)
+
 	c.connection.SetPongHandler(c.pongHandler)
 
 	//continuously read messages from the connection
