@@ -46,6 +46,24 @@ func (ws *Manager) ServeWebsocket(w http.ResponseWriter, r *http.Request) {
 		WriteBufferSize: 1024,
 	}
 
+	log.Println("checking OTP")
+	//block websocket connection if no OTP is present
+	otp := r.URL.Query().Get("otp")
+	if otp == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	log.Println("OTP exists")
+
+	log.Println("Checking if OTP is valid")
+	//block websocket connection if no OTP is not valid
+	if !ws.OTPs.VerifyOTP(otp) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	log.Println("OTP is valid; proceeding to open websocket")
+
 	// Upgrade the HTTP connection to a websocket connection
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
