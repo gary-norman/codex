@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"github.com/gary-norman/forum/internal/app"
 	h "github.com/gary-norman/forum/internal/http/handlers"
 	"github.com/gary-norman/forum/internal/http/websocket"
@@ -36,8 +37,9 @@ func NewWebsocketHandler(
 	reaction *h.ReactionHandler,
 	channel *h.ChannelHandler,
 	mod *h.ModHandler,
+	ctx context.Context,
 ) *websocket.Manager {
-	ws := websocket.NewManager()
+	ws := websocket.NewManager(ctx)
 
 	ws.App = app
 	ws.User = user
@@ -132,7 +134,7 @@ func NewRouteHandler(app *app.App) *RouteHandler {
 	postHandler := NewPostHandler(app, channelHandler, commentHandler, reactionHandler)
 	homeHandler := NewHomeHandler(app, channelHandler, commentHandler, postHandler, reactionHandler)
 	modHandler := NewModHandler(app, channelHandler, userHandler)
-	websocketHandler := NewWebsocketHandler(app, userHandler, postHandler, commentHandler, reactionHandler, channelHandler, modHandler)
+	websocketHandler := NewWebsocketHandler(app, userHandler, postHandler, commentHandler, reactionHandler, channelHandler, modHandler, context.Background())
 	searchHandler := NewSearchHandler(app)
 
 	// Step 3: Return fully wired router
