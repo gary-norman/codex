@@ -29,29 +29,6 @@ func NewCommentHandler(app *app.App, reaction *h.ReactionHandler) *h.CommentHand
 	}
 }
 
-func NewWebsocketHandler(
-	app *app.App,
-	user *h.UserHandler,
-	post *h.PostHandler,
-	comment *h.CommentHandler,
-	reaction *h.ReactionHandler,
-	channel *h.ChannelHandler,
-	mod *h.ModHandler,
-	ctx context.Context,
-) *websocket.Manager {
-	ws := websocket.NewManager(ctx)
-
-	ws.App = app
-	ws.User = user
-	ws.Post = post
-	ws.Comment = comment
-	ws.Reaction = reaction
-	ws.Channel = channel
-	ws.Mod = mod
-
-	return ws
-}
-
 func NewReactionHandler(app *app.App) *h.ReactionHandler {
 	return &h.ReactionHandler{
 		App: app,
@@ -100,7 +77,7 @@ func NewSessionHandler(app *app.App) *h.SessionHandler {
 	}
 }
 
-func NewAuthHandler(app *app.App, session *h.SessionHandler) *h.AuthHandler {
+func NewAuthHandler(app *app.App, session *h.SessionHandler, ws *websocket.Manager) *h.AuthHandler {
 	return &h.AuthHandler{
 		App:     app,
 		Session: session,
@@ -122,21 +99,27 @@ func NewModHandler(app *app.App, channel *h.ChannelHandler, user *h.UserHandler)
 }
 
 func NewRouteHandler(app *app.App) *RouteHandler {
-	// Step 1: Create top-level (flat) handlers without nested deps first
+	// Step 1: Create websocket manager FIRST
+	websocketHandler := websocket.NewManager(context.Background())
+
+	// Step 2: Store it in app IMMEDIATELY
+	app.Websocket = websocketHandler
+
+	// Step 3: Create top-level (flat) handlers without nested deps first
 	sessionHandler := NewSessionHandler(app)
 	reactionHandler := NewReactionHandler(app)
-	authHandler := NewAuthHandler(app, sessionHandler)
 
-	// Step 2: Create nested handlers with their deps injected
+	// Step 4: Create nested handlers with their deps injected
 	commentHandler := NewCommentHandler(app, reactionHandler)
 	channelHandler := NewChannelHandler(app, commentHandler, reactionHandler)
 	userHandler := NewUserHandler(app, channelHandler, commentHandler, reactionHandler)
 	postHandler := NewPostHandler(app, channelHandler, commentHandler, reactionHandler)
 	homeHandler := NewHomeHandler(app, channelHandler, commentHandler, postHandler, reactionHandler)
 	modHandler := NewModHandler(app, channelHandler, userHandler)
-	websocketHandler := NewWebsocketHandler(app, userHandler, postHandler, commentHandler, reactionHandler, channelHandler, modHandler, context.Background())
 	searchHandler := NewSearchHandler(app)
 
+	// Moved authHandler down as need websocketHandler
+	authHandler := NewAuthHandler(app, sessionHandler, websocketHandler)
 	// Step 3: Return fully wired router
 	return &RouteHandler{
 		App:       app,
