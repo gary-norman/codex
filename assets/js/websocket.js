@@ -24,22 +24,29 @@ function routeEvent(event) {
 }
 
 function sendEvent(eventName, payload) {
+    if (!connection || connection.readyState !== WebSocket.OPEN) {
+        console.error("WebSocket not connected!");
+        alert("WebSocket not connected. Please wait or refresh the page.");
+        return;
+    }
+
     const event = new Event(eventName, payload);
     connection.send(JSON.stringify(event));
+    console.log("Event sent:", event);
 }
 
-function connectWebSocket() {
+export function connectWebSocket(otp) {
     if (isConnecting || (connection && connection.readyState === WebSocket.OPEN)) {
         return;
     }
 
     isConnecting = true;
 
-    connection = new WebSocket("ws://localhost:8888/ws");
+    connection = new WebSocket("ws://localhost:8888/ws?otp=" + otp);
 
     connection.onopen = function() {
         console.log("✅ WebSocket OPEN - readyState:", connection.readyState);
-        isConnecting = true;
+        isConnecting = false;
     };
 
     connection.onmessage = function(evt) {
@@ -65,14 +72,30 @@ function connectWebSocket() {
     };
 }
 
+// In your main JS file that runs on every page
+async function initWebSocket() {
+    try {
+        const response = await fetch('/api/ws-otp', {
+            credentials: 'include' // Include cookies for auth
+        });
 
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Got OTP for WebSocket:', data.otp);
+            connectWebSocket(data.otp);
+        }
+    } catch (error) {
+        console.error('Failed to get WebSocket OTP:', error);
+    }
+}
+
+// Call this when page loads if user is logged in
+if (document.cookie.includes('session_token')) {
+    void initWebSocket();
+}
 
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Initial connection
-    connectWebSocket();
-
-
 
     const sendMessageButton = document.getElementById("sendMessage");
     sendMessageButton.addEventListener("click", sendMessage);
