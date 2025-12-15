@@ -121,6 +121,7 @@ func NewApp(db *sql.DB, imagePath string) *App {
 		Muted:       &sqlite.MutedChannelModel{DB: db},
 		Cookies:     &sqlite.CookieModel{DB: db},
 		Rules:       &sqlite.RuleModel{DB: db},
+		Websocket:   nil, // Add this - will be set later by routes
 
 		Paths: models.ImagePaths{
 			Channel: imagePath + "channel-images/",
