@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/gary-norman/forum/internal/app"
@@ -20,8 +19,7 @@ func (h *ReactionHandler) GetPostsLikesAndDislikes(posts []*models.Post) []*mode
 		likes, dislikes, err := h.App.Reactions.CountReactions(post.ID, 0) // Pass 0 for CommentID if it's a post
 		// fmt.Printf("PostID: %v, Likes: %v, Dislikes: %v\n", posts[i].ID, likes, dislikes)
 		if err != nil {
-			postStr := fmt.Sprintf("PostID: %v", post.ID)
-			log.Printf(ErrorMsgs.Generic, "Error counting reactions", postStr, "GetPostsLikesAndDislikes", err)
+			models.LogError("Failed to count reactions for post", err, "PostID:", post.ID)
 			likes, dislikes = 0, 0 // Default values if there is an error
 		}
 		models.React(posts[p], likes, dislikes)
@@ -39,7 +37,7 @@ func (h *ReactionHandler) getLastReactionTimeForPosts(posts []*models.Post) ([]*
 
 		lastReactionTime, err := h.App.Reactions.GetLastReaction(p.ID, 0)
 		if err != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "Error getting last reaction time", err)
+			models.LogError("Failed to get last reaction time for post", err, "PostID:", p.ID)
 		}
 		if lastReactionTime.Created.IsZero() {
 			// fmt.Printf("No reaction time found for PostID: %v\n", p.ID)
@@ -59,8 +57,7 @@ func (h *ReactionHandler) GetCommentsLikesAndDislikes(comments []models.Comment)
 		likes, dislikes, err := h.App.Reactions.CountReactions(0, comment.ID) // Pass 0 for PostID if it's a comment
 		// fmt.Printf("PostID: %v, Likes: %v, Dislikes: %v\n", posts[i].ID, likes, dislikes)
 		if err != nil {
-			postStr := fmt.Sprintf("CommentID: %v", comment.ID)
-			log.Printf(ErrorMsgs.Generic, "Error counting reactions", postStr, "GetPostsLikesAndDislikes", err)
+			models.LogError("Failed to count reactions for comment", err, "CommentID:", comment.ID)
 			likes, dislikes = 0, 0 // Default values if there is an error
 		}
 		models.React(&comments[c], likes, dislikes)
@@ -69,7 +66,7 @@ func (h *ReactionHandler) GetCommentsLikesAndDislikes(comments []models.Comment)
 }
 
 func (h *ReactionHandler) StoreReaction(w http.ResponseWriter, r *http.Request) {
-	log.Printf("using storeReaction()")
+	models.LogInfoWithContext(r.Context(), "Processing reaction storage request")
 
 	// Variable to hold the decoded data
 	var input models.ReactionInput
@@ -96,7 +93,7 @@ func (h *ReactionHandler) StoreReaction(w http.ResponseWriter, r *http.Request) 
 
 	//// Validate that at least one of reactedPostID or reactedCommentID is non-zero
 	if (reactionData.ReactedPostID == nil || *reactionData.ReactedPostID == 0) && (reactionData.ReactedCommentID == nil || *reactionData.ReactedCommentID == 0) {
-		log.Println("invalid reactionData: both reactedPostID and reactedCommentID are nil or zero")
+		models.LogWarnWithContext(r.Context(), "Invalid reaction data: both reactedPostID and reactedCommentID are nil or zero")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -116,11 +113,10 @@ func (h *ReactionHandler) StoreReaction(w http.ResponseWriter, r *http.Request) 
 		updatedStr = "comment"
 	}
 
-	updatedPair := fmt.Sprintf("%s: %v", updatedStr, updatedID)
-	log.Printf(ErrorMsgs.KeyValuePair, "Updating like for", updatedPair)
+	models.LogInfoWithContext(r.Context(), "Updating reaction for %s", fmt.Sprintf("%s: %d", updatedStr, updatedID))
 
 	if err := h.App.Reactions.Upsert(reactionData.Liked, reactionData.Disliked, reactionData.AuthorID, reactionData.PostID, reactionData.CommentID); err != nil {
-		log.Printf(ErrorMsgs.Update, updatedPair, "storeReaction > h.App.reactions.Upsert", err)
+		models.LogErrorWithContext(r.Context(), "Failed to upsert reaction", err, fmt.Sprintf("%s: %d", updatedStr, updatedID))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -131,7 +127,7 @@ func (h *ReactionHandler) StoreReaction(w http.ResponseWriter, r *http.Request) 
 	// w.WriteHeader(http.StatusCreated)
 	err = json.NewEncoder(w).Encode(map[string]string{"message": "Reaction added to database"})
 	if err != nil {
-		log.Printf(ErrorMsgs.Post, err)
+		models.LogErrorWithContext(r.Context(), "Failed to encode JSON response", err)
 		http.Error(w, err.Error(), 500)
 		return
 	}

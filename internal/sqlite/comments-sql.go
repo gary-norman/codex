@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/gary-norman/forum/internal/models"
 )
@@ -18,8 +17,7 @@ func (m *CommentModel) Upsert(comment models.Comment) error {
 	// Check if the reaction exists
 	exists, err := m.Exists(comment)
 	if err != nil {
-		fmt.Println("Upsert Comment > Exists error")
-		return errors.New(err.Error())
+		return fmt.Errorf("failed to check existence of comment: %w", err)
 	}
 
 	if exists {
@@ -43,7 +41,7 @@ func (m *CommentModel) Insert(comment models.Comment) error {
 	// Ensure rollback on failure
 	defer func() {
 		if p := recover(); p != nil {
-			fmt.Println("Rolling back transaction")
+			models.LogWarn("Panic occurred, rolling back transaction: %v", p)
 			_ = tx.Rollback()
 			panic(p)
 		} else if err != nil {
@@ -52,13 +50,13 @@ func (m *CommentModel) Insert(comment models.Comment) error {
 	}()
 
 	// Define the SQL statement
-	stmt1 := `INSERT INTO Comments 
+	query := `INSERT INTO Comments 
 		(Content, Created, Author, AuthorID, AuthorAvatar, ChannelName, ChannelID, CommentedPostID, 
-CommentedCommentID, IsCommentable, IsFlagged, IsReply)
+		CommentedCommentID, IsCommentable, IsFlagged, IsReply)
 		VALUES (?, DateTime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	// Execute the query, dereferencing the pointers is handled by database/sql
-	_, err = tx.Exec(stmt1,
+	_, err = tx.Exec(query,
 		comment.Content,
 		comment.Author,
 		comment.AuthorID,
@@ -83,7 +81,7 @@ CommentedCommentID, IsCommentable, IsFlagged, IsReply)
 		return fmt.Errorf("failed to commit transaction for Insert in Comments: %w", err)
 	}
 
-	return err
+	return nil
 }
 
 func (m *CommentModel) Update(comment models.Comment) error {
@@ -93,7 +91,6 @@ func (m *CommentModel) Update(comment models.Comment) error {
 
 	// Begin the transaction
 	tx, err := m.DB.Begin()
-	// fmt.Println("Beginning UPDATE transaction")
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction for Insert in Comments: %w", err)
 	}
@@ -101,7 +98,7 @@ func (m *CommentModel) Update(comment models.Comment) error {
 	// Ensure rollback on failure
 	defer func() {
 		if p := recover(); p != nil {
-			fmt.Println("Rolling back transaction")
+			models.LogWarn("Panic occurred, rolling back transaction: %v", p)
 			_ = tx.Rollback()
 			panic(p)
 		} else if err != nil {
@@ -111,12 +108,12 @@ func (m *CommentModel) Update(comment models.Comment) error {
 
 	// TODO add Updated field, which should be populated on update
 	// Define the SQL statement
-	stmt1 := `UPDATE Comments 
+	query := `UPDATE Comments 
 		SET Content = ?, IsCommentable = ?, IsFlagged = ?, Author = ?, AuthorAvatar = ?, ChannelName = ?, ChannelID = ?
 		WHERE AuthorID = ? AND (CommentedPostID = ? OR CommentedCommentID = ?)`
 
 	// Execute the query
-	_, err = tx.Exec(stmt1,
+	_, err = tx.Exec(query,
 		comment.Content,
 		comment.Author,
 		comment.AuthorID,
@@ -135,12 +132,11 @@ func (m *CommentModel) Update(comment models.Comment) error {
 
 	// Commit the transaction
 	err = tx.Commit()
-	// fmt.Println("Committing UPDATE transaction")
 	if err != nil {
 		return fmt.Errorf("failed to commit transaction for Update in Comments: %w", err)
 	}
 
-	return err
+	return nil
 }
 
 // Exists helps avoid creating duplicate comments by determining whether a comment for the specific combination of AuthorID, PostID/CommentID and Content
@@ -167,7 +163,6 @@ func (m *CommentModel) Exists(comment models.Comment) (bool, error) {
 func (m *CommentModel) Delete(commentID int64) error {
 	// Begin the transaction
 	tx, err := m.DB.Begin()
-	// fmt.Println("Beginning DELETE transaction")
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction for Delete in Comments: %w", err)
 	}
@@ -175,7 +170,7 @@ func (m *CommentModel) Delete(commentID int64) error {
 	// Ensure rollback on failure
 	defer func() {
 		if p := recover(); p != nil {
-			fmt.Println("Rolling back transaction")
+			models.LogWarn("Panic occurred, rolling back transaction: %v", p)
 			_ = tx.Rollback()
 			panic(p)
 		} else if err != nil {
@@ -183,9 +178,9 @@ func (m *CommentModel) Delete(commentID int64) error {
 		}
 	}()
 
-	stmt1 := `DELETE FROM Comments WHERE ID = ?`
+	query := `DELETE FROM Comments WHERE ID = ?`
 	// Execute the query, dereferencing the pointers for ID values
-	_, err = m.DB.Exec(stmt1, commentID)
+	_, err = m.DB.Exec(query, commentID)
 	// fmt.Printf("Deleting from Reactions where commentID: %v\n", commentID)
 	if err != nil {
 		return fmt.Errorf("failed to execute Delete query: %w", err)
@@ -193,28 +188,38 @@ func (m *CommentModel) Delete(commentID int64) error {
 
 	// Commit the transaction
 	err = tx.Commit()
-	// fmt.Println("Committing DELETE transaction")
 	if err != nil {
 		return fmt.Errorf("failed to commit transaction for Delete in Comments: %w", err)
 	}
 
-	return err
+	return nil
 }
 
 func (m *CommentModel) GetCommentByPostID(id int64) ([]models.Comment, error) {
+	// Begin the transaction
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for GetCommentByPostID in Comments: %w", err)
+	}
+
 	if m == nil {
-		log.Println("Error: DB is nil")
 		return nil, fmt.Errorf("database connection is not initialized")
 	}
 	stmt := "SELECT * FROM Comments WHERE CommentedPostID = ? ORDER BY ID DESC"
 	rows, err := m.DB.Query(stmt, id)
 	if err != nil {
-		log.Printf(ErrorMsgs.Query, stmt, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to query comments by post ID %d: %w", id, err)
 	}
 	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarn("Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "GetCommentByPostID", closeErr)
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 	var comments []models.Comment
@@ -237,28 +242,44 @@ func (m *CommentModel) GetCommentByPostID(id int64) ([]models.Comment, error) {
 			&c.ChannelID,
 		)
 		if scanErr != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "Error", "scan")
-			return nil, scanErr
+			return nil, fmt.Errorf("failed to scan comment row: %w", scanErr)
 		}
 		comments = append(comments, c)
 	}
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction for GetCommentByPostID in Comments: %w", err)
+	}
+
 	return comments, nil
 }
 
 func (m *CommentModel) GetCommentByCommentID(id int64) ([]models.Comment, error) {
+	// Begin the transaction
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for GetCommentByCommentID in Comments: %w", err)
+	}
+
 	if m == nil {
-		log.Println("Error: DB is nil")
 		return nil, fmt.Errorf("database connection is not initialized")
 	}
 	stmt := "SELECT * FROM Comments WHERE CommentedCommentID = ? ORDER BY ID DESC"
 	rows, err := m.DB.Query(stmt, id)
 	if err != nil {
-		log.Printf(ErrorMsgs.Query, stmt, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to query comments by comment ID %d: %w", id, err)
 	}
 	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarn("Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "GetCommentByCommentID", closeErr)
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 	var comments []models.Comment
@@ -281,37 +302,51 @@ func (m *CommentModel) GetCommentByCommentID(id int64) ([]models.Comment, error)
 			&c.IsCommentable,
 		)
 		if scanErr != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "Error", "scan")
-			return nil, scanErr
+			return nil, fmt.Errorf("failed to scan comment row: %w", scanErr)
 		}
 		comments = append(comments, c)
 	}
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction for GetCommentByCommentID in Comments: %w", err)
+	}
+
 	return comments, nil
 }
 
 func (m *CommentModel) All() ([]models.Comment, error) {
+	// Begin the transaction
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for All in Comments: %w", err)
+	}
+
 	stmt := "SELECT ID, Content, Created, Author, AuthorID, AuthorAvatar, ChannelName, ChannelID, CommentedPostID, CommentedCommentID, IsCommentable, IsFlagged FROM Comments ORDER BY ID DESC"
 
 	if m == nil {
-		log.Println("Error: DB is nil")
 		return nil, fmt.Errorf("database connection is not initialized")
 	}
 
 	if m.DB == nil {
-		log.Println("Error: CommentModel is nil")
 		return nil, fmt.Errorf("database connection is not initialized")
 	}
 
 	rows, selectErr := m.DB.Query(stmt)
 	if selectErr != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "Error:", "select")
-		log.Printf(ErrorMsgs.Query, stmt, selectErr)
-		return nil, selectErr
+		return nil, fmt.Errorf("failed to query all comments: %w", selectErr)
 	}
 
 	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarn("Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "All", closeErr)
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 
@@ -334,11 +369,14 @@ func (m *CommentModel) All() ([]models.Comment, error) {
 			&p.IsFlagged,
 			&p.IsCommentable)
 		if scanErr != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "Error:", "scan")
-			log.Printf(ErrorMsgs.Query, stmt, scanErr)
-			return nil, scanErr
+			return nil, fmt.Errorf("failed to scan comment row: %w", scanErr)
 		}
 		Comments = append(Comments, p)
+	}
+	// Commit the transaction
+	err = tx.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction for All in Comments: %w", err)
 	}
 
 	return Comments, nil
@@ -377,8 +415,7 @@ func (m *CommentModel) GetComment(authorID int, reactedPostID int, reactedCommen
 			return nil, nil
 		}
 		// Other errors
-		log.Printf("Error fetching reaction: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch reaction: %w", err)
 	}
 
 	// Return the existing reaction

@@ -2,8 +2,6 @@
 package handlers
 
 import (
-	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -29,19 +27,19 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 	var ErrorPage bool
 
 	start := time.Now()
-	fmt.Println(r.PathValue("invalidString"))
+	models.LogInfoWithContext(r.Context(), "PathValue invalidString: %v", r.PathValue("invalidString"))
 	stringCheck := []string{" ", "favicon.ico"}
 	if r.PathValue("invalidString") != "" {
 		valid := false
 		for _, v := range stringCheck {
-			fmt.Println("checking against valid string:", v)
+			models.LogInfoWithContext(r.Context(), "Checking against valid string: %v", v)
 			if r.PathValue("invalidString") == v {
 				valid = true
 				break
 			}
 		}
 		if !valid {
-			fmt.Printf("illegal string '%v' detected\n", r.PathValue("invalidString"))
+			models.LogWarnWithContext(r.Context(), "Illegal string detected: %v", r.PathValue("invalidString"))
 			ErrorPage = true
 			w.WriteHeader(400)
 			// ErrorPage = models.ErrorPage{
@@ -69,7 +67,7 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 	// SECTION --- user ---
 	allUsers, allUsersErr := h.App.Users.All()
 	if allUsersErr != nil {
-		log.Printf(ErrorMsgs.Query, "RenderIndex> users > All", allUsersErr)
+		models.LogErrorWithContext(r.Context(), "Failed to fetch all users in RenderIndex", allUsersErr)
 	}
 	for u := range allUsers {
 		models.UpdateTimeSince(allUsers[u])
@@ -79,7 +77,7 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 	for u := range allUsers {
 		allUsers[u].Followers, allUsers[u].Following, allUsersErr = h.App.Loyalty.CountUsers(allUsers[u].ID)
 		if allUsersErr != nil {
-			log.Printf(ErrorMsgs.Query, "RenderIndex> users > All > loyalty", allUsersErr)
+			models.LogErrorWithContext(r.Context(), "Failed to count user followers/following", allUsersErr)
 		}
 	}
 
@@ -93,13 +91,13 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 	// attach following/follower numbers to the random user
 	randomUser.Followers, randomUser.Following, currentUserErr = h.App.Loyalty.CountUsers(randomUser.ID)
 	if currentUserErr != nil {
-		log.Printf(ErrorMsgs.Query, "RenderIndex> users > All", allUsersErr)
+		models.LogErrorWithContext(r.Context(), "Failed to count random user followers/following", currentUserErr)
 	}
 
 	// SECTION --- posts and comments ---
 	allPosts, err := h.App.Posts.All()
 	if err != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "Error fetching all posts", err)
+		models.LogErrorWithContext(r.Context(), "Failed to fetch all posts", err)
 	}
 	// Retrieve total likes and dislikes for each post
 	allPosts = h.Reaction.GetPostsLikesAndDislikes(allPosts)
@@ -107,7 +105,7 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 	// Retrieve last reaction time for posts
 	allPosts, err = h.Reaction.getLastReactionTimeForPosts(allPosts)
 	if err != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "Error getting last reaction time for allPosts", err)
+		models.LogErrorWithContext(r.Context(), "Failed to get last reaction time for posts", err)
 	}
 
 	for p := range allPosts {
@@ -115,26 +113,25 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	allPosts, err = h.Comment.GetPostsComments(allPosts)
 	if err != nil {
-		log.Printf(ErrorMsgs.NotFound, "allPosts comments", "RenderIndex", err)
+		models.LogErrorWithContext(r.Context(), "Failed to fetch post comments", err)
 	}
 
 	for p := range allPosts {
 		channelIDs, err := h.App.Channels.GetChannelIDFromPost(allPosts[p].ID)
 		if err != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "RenderIndex > channelID", err)
+			models.LogErrorWithContext(r.Context(), "Failed to get channel ID from post", err)
 		}
 		if len(allPosts) > 0 && len(channelIDs) > 0 {
 			allPosts[p].ChannelID = channelIDs[0]
 		} else {
-			fetchErr := fmt.Sprintf("post ID: %v does not belong to any channel", allPosts[p].ID)
-			fmt.Printf(ErrorMsgs.KeyValuePair, "error fetching posts", fetchErr)
+			models.LogWarnWithContext(r.Context(), "Post %d does not belong to any channel", allPosts[p].ID)
 		}
 	}
 
 	// SECTION --- channels --
 	allChannels, err := h.App.Channels.All()
 	if err != nil {
-		log.Printf(ErrorMsgs.Query, "channels.All-index", err)
+		models.LogErrorWithContext(r.Context(), "Failed to fetch all channels", err)
 	}
 	for c := range allChannels {
 		models.UpdateTimeSince(allChannels[c])
@@ -158,20 +155,20 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 		// attach following/follower numbers to currently logged-in user
 		currentUser.Followers, currentUser.Following, err = h.App.Loyalty.CountUsers(currentUser.ID)
 		if err != nil {
-			fmt.Printf(ErrorMsgs.KeyValuePair, "RenderIndex > currentUser loyalty", err)
+			models.LogErrorWithContext(r.Context(), "Failed to count current user loyalty", err)
 		}
 		// get owned and joined channels of current user
 		memberships, memberErr := h.App.Memberships.UserMemberships(currentUser.ID)
 		if memberErr != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "RenderIndex > UserMemberships", memberErr)
+			models.LogErrorWithContext(r.Context(), "Failed to fetch user memberships", memberErr)
 		}
 		ownedChannels, err = h.App.Channels.OwnedOrJoinedByCurrentUser(currentUser.ID)
 		if err != nil {
-			log.Printf(ErrorMsgs.Query, "RenderIndex > user owned channels", err)
+			models.LogErrorWithContext(r.Context(), "Failed to fetch user owned channels", err)
 		}
 		joinedChannels, err = h.Channel.JoinedByCurrentUser(memberships)
 		if err != nil {
-			log.Printf(ErrorMsgs.Query, "user joined channels", err)
+			models.LogErrorWithContext(r.Context(), "Failed to fetch user joined channels", err)
 		}
 
 		// ownedAndJoinedChannels = append(ownedChannels, joinedChannels...)
@@ -201,14 +198,14 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 		// GetUserChats for the current user
 		chats, err = h.App.Chats.GetUserChats(currentUser.ID)
 		if err != nil {
-			log.Printf(ErrorMsgs.Query, "RenderIndex > GetUserChats", err)
+			models.LogErrorWithContext(r.Context(), "Failed to fetch user chats", err)
 		}
 
 		// GetChatMessages for each chat
 		for _, chat := range chats {
 			messages, err := h.App.Chats.GetChatMessages(chat.ID)
 			if err != nil {
-				log.Printf(ErrorMsgs.Query, "RenderIndex > GetChatMessages", err)
+				models.LogErrorWithContext(r.Context(), "Failed to fetch chat messages", err)
 			}
 			chat.Messages = messages
 		}
@@ -302,11 +299,11 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 		ImagePaths: h.App.Paths,
 		ErrorPage:  ErrorPage,
 	}
-	log.Printf(ErrorMsgs.KeyValuePair, "RenderIndex > data.UserID", data.UserID)
+	models.LogInfoWithContext(r.Context(), "RenderIndex data.UserID: %v", data.UserID)
 	// models.JsonError(TemplateData)
 	tpl, err := view.GetTemplate()
 	if err != nil {
-		log.Printf(ErrorMsgs.Parse, "templates", "RenderIndex", err)
+		models.LogErrorWithContext(r.Context(), "Failed to parse templates", err)
 		return
 	}
 
@@ -319,10 +316,10 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 
 	execErr := t.Execute(w, data)
 	if execErr != nil {
-		log.Printf(ErrorMsgs.Execute, execErr)
+		models.LogErrorWithContext(r.Context(), "Failed to execute template", execErr)
 		return
 	}
-	log.Printf(ErrorMsgs.KeyValuePair, "RenderIndex Render time", time.Since(start))
+	models.LogInfoWithContext(r.Context(), "RenderIndex render time: %v", time.Since(start))
 }
 
 func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
@@ -335,7 +332,7 @@ func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 	// SECTION --- user ---
 	allUsers, allUsersErr := h.App.Users.All()
 	if allUsersErr != nil {
-		log.Printf(ErrorMsgs.Query, "getHome> users > All", allUsersErr)
+		models.LogErrorWithContext(r.Context(), "Failed to fetch all users in GetHome", allUsersErr)
 	}
 	for u := range allUsers {
 		models.UpdateTimeSince(allUsers[u])
@@ -345,7 +342,7 @@ func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 	for u := range allUsers {
 		allUsers[u].Followers, allUsers[u].Following, allUsersErr = h.App.Loyalty.CountUsers(allUsers[u].ID)
 		if allUsersErr != nil {
-			log.Printf(ErrorMsgs.Query, "getHome> users > All > loyalty", allUsersErr)
+			models.LogErrorWithContext(r.Context(), "Failed to count user followers/following", allUsersErr)
 		}
 	}
 
@@ -359,13 +356,13 @@ func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 	// attach following/follower numbers to the random user
 	randomUser.Followers, randomUser.Following, currentUserErr = h.App.Loyalty.CountUsers(randomUser.ID)
 	if currentUserErr != nil {
-		log.Printf(ErrorMsgs.Query, "getHome> users > All", allUsersErr)
+		models.LogErrorWithContext(r.Context(), "Failed to count random user followers/following", currentUserErr)
 	}
 
 	// SECTION --- posts and comments ---
 	allPosts, err := h.App.Posts.All()
 	if err != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "Error fetching all posts", err)
+		models.LogErrorWithContext(r.Context(), "Failed to fetch all posts", err)
 	}
 	// Retrieve total likes and dislikes for each post
 	allPosts = h.Reaction.GetPostsLikesAndDislikes(allPosts)
@@ -373,7 +370,7 @@ func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 	// Retrieve last reaction time for posts
 	allPosts, err = h.Reaction.getLastReactionTimeForPosts(allPosts)
 	if err != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "Error getting last reaction time for allPosts", err)
+		models.LogErrorWithContext(r.Context(), "Failed to get last reaction time for posts", err)
 	}
 
 	for p := range allPosts {
@@ -381,26 +378,25 @@ func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 	}
 	allPosts, err = h.Comment.GetPostsComments(allPosts)
 	if err != nil {
-		log.Printf(ErrorMsgs.NotFound, "allPosts comments", "getHome", err)
+		models.LogErrorWithContext(r.Context(), "Failed to fetch post comments", err)
 	}
 
 	for p := range allPosts {
 		channelIDs, err := h.App.Channels.GetChannelIDFromPost(allPosts[p].ID)
 		if err != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "getHome > channelID", err)
+			models.LogErrorWithContext(r.Context(), "Failed to get channel ID from post", err)
 		}
 		if len(allPosts) > 0 && len(channelIDs) > 0 {
 			allPosts[p].ChannelID = channelIDs[0]
 		} else {
-			fetchErr := fmt.Sprintf("post ID: %v does not belong to any channel", allPosts[p].ID)
-			fmt.Printf(ErrorMsgs.KeyValuePair, "error fetching posts", fetchErr)
+			models.LogWarnWithContext(r.Context(), "Post %d does not belong to any channel", allPosts[p].ID)
 		}
 	}
 
 	// SECTION --- channels --
 	allChannels, err := h.App.Channels.All()
 	if err != nil {
-		log.Printf(ErrorMsgs.Query, "channels.All-home", err)
+		models.LogErrorWithContext(r.Context(), "Failed to fetch all channels", err)
 	}
 	for c := range allChannels {
 		models.UpdateTimeSince(allChannels[c])
@@ -425,20 +421,20 @@ func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 		// attach following/follower numbers to currently logged-in user
 		currentUser.Followers, currentUser.Following, err = h.App.Loyalty.CountUsers(currentUser.ID)
 		if err != nil {
-			fmt.Printf(ErrorMsgs.KeyValuePair, "getHome > currentUser loyalty", err)
+			models.LogErrorWithContext(r.Context(), "Failed to count current user loyalty", err)
 		}
 		// get owned and joined channels of current user
 		memberships, memberErr := h.App.Memberships.UserMemberships(currentUser.ID)
 		if memberErr != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "getHome > UserMemberships", memberErr)
+			models.LogErrorWithContext(r.Context(), "Failed to fetch user memberships", memberErr)
 		}
 		ownedChannels, err = h.App.Channels.OwnedOrJoinedByCurrentUser(currentUser.ID)
 		if err != nil {
-			log.Printf(ErrorMsgs.Query, "GetHome > user owned channels", err)
+			models.LogErrorWithContext(r.Context(), "Failed to fetch user owned channels", err)
 		}
 		joinedChannels, err = h.Channel.JoinedByCurrentUser(memberships)
 		if err != nil {
-			log.Printf(ErrorMsgs.Query, "user joined channels", err)
+			models.LogErrorWithContext(r.Context(), "Failed to fetch user joined channels", err)
 		}
 
 		// ownedAndJoinedChannels = append(ownedChannels, joinedChannels...)
@@ -481,5 +477,5 @@ func (h *HomeHandler) GetHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	view.RenderPageData(w, data)
-	log.Printf(ErrorMsgs.KeyValuePair, "GetHome Render time", time.Since(start))
+	models.LogInfoWithContext(r.Context(), "GetHome render time: %v", time.Since(start))
 }

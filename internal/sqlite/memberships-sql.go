@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"database/sql"
-	"log"
 
 	"github.com/gary-norman/forum/internal/models"
 )
@@ -12,21 +11,21 @@ type MembershipModel struct {
 }
 
 func (m *MembershipModel) Insert(userID models.UUIDField, channelID int64) error {
-	stmt := "INSERT INTO Memberships (UserID, ChannelID, Created) VALUES (?, ?, DateTime('now'))"
-	_, err := m.DB.Exec(stmt, userID, channelID)
+	query := "INSERT INTO Memberships (UserID, ChannelID, Created) VALUES (?, ?, DateTime('now'))"
+	_, err := m.DB.Exec(query, userID, channelID)
 	return err
 }
 
 func (m *MembershipModel) UserMemberships(userID models.UUIDField) ([]models.Membership, error) {
 	// fmt.Printf(ErrorMsgs.KeyValuePair, "Checking memberships for UserID", userID)
-	stmt := "SELECT ID, UserID, ChannelID, Created FROM Memberships WHERE UserID = ?"
-	rows, queryErr := m.DB.Query(stmt, userID)
+	query := "SELECT ID, UserID, ChannelID, Created FROM Memberships WHERE UserID = ?"
+	rows, queryErr := m.DB.Query(query, userID)
 	if queryErr != nil {
 		return nil, queryErr
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "UserMemberships", closeErr)
+			models.LogWarn("Failed to close rows in UserMemberships: %v", closeErr)
 		}
 	}()
 	var memberships []models.Membership
@@ -46,15 +45,15 @@ func (m *MembershipModel) UserMemberships(userID models.UUIDField) ([]models.Mem
 }
 
 func (m *MembershipModel) All() ([]models.Membership, error) {
-	stmt := "SELECT ID, UserID, ChannelID, Created FROM Memberships ORDER BY ID DESC"
-	rows, err := m.DB.Query(stmt)
+	query := "SELECT ID, UserID, ChannelID, Created FROM Memberships ORDER BY ID DESC"
+	rows, err := m.DB.Query(query)
 	if err != nil {
 		return nil, err
 	}
 
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "All", closeErr)
+			models.LogWarn("Failed to close rows in All: %v", closeErr)
 		}
 	}()
 

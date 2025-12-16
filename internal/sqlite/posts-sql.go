@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/gary-norman/forum/internal/models"
 )
@@ -33,14 +32,12 @@ func (m *PostModel) All() ([]*models.Post, error) {
 	stmt := "SELECT * FROM Posts ORDER BY Created DESC"
 	rows, selectErr := m.DB.Query(stmt)
 	if selectErr != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "Error:", "select")
-		log.Printf(ErrorMsgs.Query, stmt, selectErr)
-		return nil, selectErr
+		return nil, fmt.Errorf("failed to query all posts: %w", selectErr)
 	}
 
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "All", closeErr)
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 
@@ -60,17 +57,13 @@ func (m *PostModel) All() ([]*models.Post, error) {
 			&p.AuthorAvatar,
 			&p.IsFlagged)
 		if scanErr != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "Error", "scan")
-			log.Printf(ErrorMsgs.Query, stmt, scanErr)
-			return nil, scanErr
+			return nil, fmt.Errorf("failed to scan post row: %w", scanErr)
 		}
 		Posts = append(Posts, &p)
 	}
 
 	if rowsErr := rows.Err(); rowsErr != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "Error", "rows")
-		log.Printf(ErrorMsgs.Query, stmt, rowsErr)
-		return nil, rowsErr
+		return nil, fmt.Errorf("error iterating post rows: %w", rowsErr)
 	}
 
 	return Posts, nil
@@ -80,13 +73,11 @@ func (m *PostModel) GetPostsByUserID(user models.UUIDField) ([]*models.Post, err
 	stmt := "SELECT * FROM posts WHERE AuthorID = ? ORDER BY ID DESC"
 	rows, err := m.DB.Query(stmt, user)
 	if err != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "Error", "select")
-		log.Printf(ErrorMsgs.Query, stmt, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to query posts by user ID: %w", err)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "All", closeErr)
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 
@@ -106,9 +97,7 @@ func (m *PostModel) GetPostsByUserID(user models.UUIDField) ([]*models.Post, err
 			&p.AuthorAvatar,
 			&p.IsFlagged)
 		if scanErr != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "Error", "scan")
-			log.Printf(ErrorMsgs.Query, stmt, scanErr)
-			return nil, scanErr
+			return nil, fmt.Errorf("failed to scan post row: %w", scanErr)
 		}
 		Posts = append(Posts, &p)
 	}
@@ -119,13 +108,11 @@ func (m *PostModel) GetPostsByChannel(channel int64) ([]*models.Post, error) {
 	stmt := "SELECT * FROM Posts WHERE ID IN (SELECT PostID FROM PostChannels WHERE ChannelID = ?) ORDER BY Created DESC"
 	rows, err := m.DB.Query(stmt, channel)
 	if err != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "Error", "select")
-		log.Printf(ErrorMsgs.Query, stmt, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to query posts by channel: %w", err)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "All", closeErr)
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 
@@ -145,18 +132,10 @@ func (m *PostModel) GetPostsByChannel(channel int64) ([]*models.Post, error) {
 			&p.AuthorAvatar,
 			&p.IsFlagged)
 		if scanErr != nil {
-			log.Printf(ErrorMsgs.KeyValuePair, "Error", "scan")
-			log.Printf(ErrorMsgs.Query, stmt, scanErr)
-			return nil, scanErr
+			return nil, fmt.Errorf("failed to scan post row: %w", scanErr)
 		}
 		Posts = append(Posts, &p)
 	}
-
-	// if rowsErr := rows.Err(); rowsErr != nil {
-	// 	log.Printf(ErrorMsgs.KeyValuePair, "Error:", "rows")
-	// 	log.Printf(ErrorMsgs.Query, stmt, rowsErr)
-	// 	return nil, rowsErr
-	// }
 
 	return Posts, nil
 }
@@ -178,9 +157,7 @@ func (m *PostModel) GetPostByID(id int64) (models.Post, error) {
 		&p.AuthorAvatar,
 		&p.IsFlagged)
 	if err != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "Error", "scan")
-		log.Printf(ErrorMsgs.Query, stmt, err)
-		return p, err
+		return p, fmt.Errorf("failed to get post by ID %d: %w", id, err)
 	}
 
 	return p, nil
@@ -257,10 +234,9 @@ func (m *PostModel) FindCurrentPost(column string, value any) ([]models.Post, er
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			fmt.Println("No post found")
 			return nil, nil // No post found
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to find post by column %s: %w", column, err)
 	}
 
 	post.AuthorAvatar = avatar.String

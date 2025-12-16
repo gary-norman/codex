@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,6 +20,7 @@ type PostHandler struct {
 }
 
 // GetUserPosts returns a slice of Posts that belong to channels the user follows. If no user is logged in, it returns all posts
+// Note: This method doesn't have access to context, so logging uses background context
 func (p *PostHandler) GetUserPosts(user *models.User, allPosts []*models.Post) []*models.Post {
 	if user == nil {
 		return allPosts
@@ -28,17 +28,17 @@ func (p *PostHandler) GetUserPosts(user *models.User, allPosts []*models.Post) [
 
 	memberships, memberErr := p.App.Memberships.UserMemberships(user.ID)
 	if memberErr != nil {
-		log.Printf(ErrorMsgs.KeyValuePair, "GetUserPosts > UserMemberships", memberErr)
+		models.LogErrorWithContext(nil, "Failed to fetch user memberships in GetUserPosts", memberErr)
 		return allPosts
 	}
 	ownedChannels, ownedErr := p.App.Channels.OwnedOrJoinedByCurrentUser(user.ID)
 	if ownedErr != nil {
-		log.Printf(ErrorMsgs.Query, "GetUserPosts > user owned channels", ownedErr)
+		models.LogErrorWithContext(nil, "Failed to fetch user owned channels in GetUserPosts", ownedErr)
 		return allPosts
 	}
 	joinedChannels, joinedErr := p.Channel.JoinedByCurrentUser(memberships)
 	if joinedErr != nil {
-		log.Printf(ErrorMsgs.Query, "user joined channels", joinedErr)
+		models.LogErrorWithContext(nil, "Failed to fetch user joined channels", joinedErr)
 		return allPosts
 	}
 
@@ -79,7 +79,7 @@ func (p *PostHandler) GetThisPost(w http.ResponseWriter, r *http.Request) {
 	userLoggedIn := true
 	currentUser, ok := mw.GetUserFromContext(r.Context())
 	if !ok {
-		fmt.Println(ErrorMsgs.NotFound, "currentUser", "getThisPost", "_")
+		models.LogInfoWithContext(r.Context(), "User not found in context for GetThisPost")
 		userLoggedIn = false
 	}
 
@@ -160,21 +160,21 @@ func (p *PostHandler) StorePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		models.LogErrorWithContext(r.Context(), "Failed to parse multipart form in StorePost", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		log.Printf(ErrorMsgs.Parse, "storePost", err)
 		return
 	}
 
 	channels := r.MultipartForm.Value["post_channel_list"]
 	if len(channels) < 1 {
-		log.Println(fmt.Errorf("at least one channel required"))
+		models.LogErrorWithContext(r.Context(), "At least one channel required", fmt.Errorf("at least one channel required"))
 		return
 	}
 
 	title := strings.TrimSpace(r.FormValue("title"))
 	content := strings.TrimSpace(r.FormValue("content"))
 	if title == "" || content == "" {
-		log.Println(fmt.Errorf("title and content are required"))
+		models.LogErrorWithContext(r.Context(), "Title and content are required", fmt.Errorf("title and content are required"))
 		return
 	}
 
@@ -202,7 +202,7 @@ func (p *PostHandler) StorePost(w http.ResponseWriter, r *http.Request) {
 		createPostData.IsFlagged,
 	)
 	if err != nil {
-		log.Printf(ErrorMsgs.Post, err)
+		models.LogErrorWithContext(r.Context(), "Failed to insert post", err)
 		//TODO: internal server errors should be handled better and redirect to NotFound page
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -215,7 +215,7 @@ func (p *PostHandler) StorePost(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := p.App.Channels.AddPostToChannel(channelID, postID); err != nil {
-			log.Printf("failed adding post %d to channel %d: %v", postID, channelID, err)
+			models.LogErrorWithContext(r.Context(), "Failed to add post to channel", err, "postID", postID, "channelID", channelID)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

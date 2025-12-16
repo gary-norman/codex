@@ -28,6 +28,9 @@ var (
 )
 
 func main() {
+	// Disable default logger timestamp/prefix (we add our own in LogInfo/LogWarn/LogError)
+	log.SetFlags(0)
+
 	// Initialize app first so it's available to everything
 	appInstance, cleanup, err := app.InitializeApp()
 	if err != nil {

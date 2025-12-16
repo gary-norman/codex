@@ -3,7 +3,6 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"math/rand"
 
 	"github.com/gary-norman/forum/internal/models"
@@ -130,7 +129,7 @@ func (m *ChannelModel) GetChannelByID(id int64) (*models.Channel, error) {
 	}
 	defer rows.Close()
 
-	var channel models.Channel            // Pre-allocate slice
+	var channel models.Channel             // Pre-allocate slice
 	channels := make([]*models.Channel, 0) // Pre-allocate slice
 	for rows.Next() {
 		c, err := parseChannelRows(rows)
@@ -198,7 +197,7 @@ SELECT c.ID, c.OwnerID, c.Name, c.Avatar, c.Banner, c.Description, c.Created, c.
 
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "All", closeErr)
+			models.LogWarn("Failed to close rows in ChannelModel.All: %v", closeErr)
 		}
 	}()
 
@@ -237,8 +236,7 @@ func (m *ChannelModel) AddPostToChannel(channelID, postID int64) error {
 	stmt := "INSERT INTO PostChannels (ChannelID, PostID, Created) VALUES (?, ?, DateTime('now'))"
 	_, err := m.DB.Exec(stmt, channelID, postID)
 	if err != nil {
-		log.Printf(ErrorMsgs.Insert, "PostChannels", "ChannelID", channelID, "PostID", postID, err)
-		return err
+		return fmt.Errorf("failed to add post %d to channel %d: %w", postID, channelID, err)
 	}
 	return nil
 }
@@ -248,14 +246,14 @@ func (m *ChannelModel) GetPostIDsFromChannel(channelID int64) ([]int64, error) {
 	stmt := "SELECT PostID FROM PostChannels WHERE ChannelID = ?"
 	rows, err := m.DB.Query(stmt, channelID)
 	if err != nil {
-		return postIDs, err
+		return postIDs, fmt.Errorf("failed to get post IDs from channel %d: %w", channelID, err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var postID int64
 		if err := rows.Scan(&postID); err != nil {
-			return postIDs, err
+			return postIDs, fmt.Errorf("failed to scan post ID from channel %d: %w", channelID, err)
 		}
 		postIDs = append(postIDs, postID)
 	}
@@ -268,14 +266,14 @@ func (m *ChannelModel) GetChannelIDFromPost(postID int64) ([]int64, error) {
 	stmt := "SELECT ChannelID FROM PostChannels WHERE PostID = ?"
 	rows, err := m.DB.Query(stmt, postID)
 	if err != nil {
-		return channelIDs, err
+		return channelIDs, fmt.Errorf("failed to get channel ID from post %d: %w", postID, err)
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var channelID int64
 		if err := rows.Scan(&channelID); err != nil {
-			return channelIDs, err
+			return channelIDs, fmt.Errorf("failed to scan channel ID from post %d: %w", postID, err)
 		}
 		channelIDs = append(channelIDs, channelID)
 	}
@@ -291,7 +289,7 @@ func (m *ChannelModel) GetChannelNameFromID(id int64) (string, error) {
 	stmt := "SELECT Name FROM Channels WHERE ID = ?"
 	row := m.DB.QueryRow(stmt, id)
 	if err := row.Scan(&name); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to get channel name for ID %d: %w", id, err)
 	}
 
 	return name, nil
@@ -315,7 +313,7 @@ func parseChannelRow(row *sql.Row) (*models.Channel, error) {
 		&channel.IsFlagged,
 		&channel.Members,
 	); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to scan channel row: %w", err)
 	}
 
 	channel.Avatar = avatar.String
@@ -342,7 +340,7 @@ func parseChannelRows(rows *sql.Rows) (*models.Channel, error) {
 		&channel.IsFlagged,
 		&channel.Members,
 	); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to scan channel row: %w", err)
 	}
 
 	channel.Avatar = avatar.String

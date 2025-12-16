@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -14,6 +13,14 @@ import (
 type CookieModel struct {
 	DB *sql.DB
 }
+
+var (
+	dbUpdated                      string = "✘ Failed!"
+	dbUpdatedColor                        = Colors.Red
+	stColor, csrfColor                    = Colors.Red, Colors.Red
+	stMatchString, csrfMatchString        = "✘ Failed!", "✘ Failed!"
+	successFail                           = fmt.Sprintf(" --> %s%s%s", dbUpdatedColor, dbUpdated, Colors.Reset)
+)
 
 func (m *CookieModel) CreateCookies(w http.ResponseWriter, user *models.User, ephemeral bool) (error, time.Time) {
 	sessionToken := models.GenerateToken(32)
@@ -45,7 +52,7 @@ func (m *CookieModel) CreateCookies(w http.ResponseWriter, user *models.User, ep
 	})
 
 	if err := m.UpdateCookies(user, sessionToken, csrfToken, expires); err != nil {
-		log.Printf(ErrorMsgs.Cookies, fmt.Sprintf("update user: %v", user.ID), err)
+		models.LogError("Failed to update cookies for user", err, "UserID:", user.ID)
 		return err, time.Now()
 	}
 	return nil, expires
@@ -57,21 +64,22 @@ func (m *CookieModel) QueryCookies(w http.ResponseWriter, r *http.Request, user 
 	stmt := "SELECT CookiesExpire FROM Users WHERE Username = ?"
 	rows, err := m.DB.QueryContext(ctx, stmt, user.Username)
 	if err != nil {
-		log.Printf(ErrorMsgs.Cookies, "query", err)
+		models.LogErrorWithContext(ctx, "Failed to query cookie expiration", err, "Username:", user.Username)
+		return false
 	}
 	defer rows.Close()
 
 	var expire time.Time
 	for rows.Next() {
 		if err := rows.Scan(&expire); err != nil {
-			log.Printf(ErrorMsgs.Cookies, "scan", err)
+			models.LogErrorWithContext(ctx, "Failed to scan cookie expiration row", err)
 		}
 	}
 
 	// Get the Session Token from the request cookie
 	st, err := r.Cookie("session_token")
 	if err != nil {
-		log.Printf(ErrorMsgs.Cookies, "query", err)
+		models.LogErrorWithContext(ctx, "Failed to get session_token cookie", err)
 		return false
 	}
 	csrf, _ := r.Cookie("csrf_token")
@@ -79,8 +87,6 @@ func (m *CookieModel) QueryCookies(w http.ResponseWriter, r *http.Request, user 
 	// Get the CSRF Token from the headers
 	csrfToken := r.Header.Get("x-csrf-token")
 
-	stColor, csrfColor := Colors.Red, Colors.Red
-	stMatchString, csrfMatchString := "Failed!", "Failed!"
 	if st.Value == user.SessionToken && time.Now().Before(expire) {
 		stColor = Colors.Green
 		stMatchString = "Success!"
@@ -88,7 +94,7 @@ func (m *CookieModel) QueryCookies(w http.ResponseWriter, r *http.Request, user 
 	} else {
 		err := m.DeleteCookies(w, user)
 		if err != nil {
-			log.Printf("error deleting cookies")
+			models.LogErrorWithContext(ctx, "Failed to delete expired cookies", err, "Username:", user.Username)
 		}
 		success = false
 	}
@@ -96,40 +102,37 @@ func (m *CookieModel) QueryCookies(w http.ResponseWriter, r *http.Request, user 
 		csrfColor = Colors.Green
 		csrfMatchString = "Success!"
 	}
-	log.Printf(ErrorMsgs.KeyValuePair, "Cookie SessionToken", st.Value)
-	log.Printf(ErrorMsgs.KeyValuePair, "User SessionToken", user.SessionToken)
-	log.Printf(Colors.Blue+"Session token verficiation: "+stColor+"%v\n"+Colors.Reset, stMatchString)
-	fmt.Println(ErrorMsgs.Divider)
-	log.Printf(ErrorMsgs.KeyValuePair, "Cookie csrfToken", csrf.Value)
-	log.Printf(ErrorMsgs.KeyValuePair, "Header csrfToken", csrfToken)
-	log.Printf(ErrorMsgs.KeyValuePair, "User csrfToken", user.CSRFToken)
-	log.Printf(Colors.Blue+"CSRF token verficiation: "+csrfColor+"%v\n"+Colors.Reset, csrfMatchString)
+	models.LogInfo("Cookie SessionToken: %s", st.Value)
+	models.LogInfo("User SessionToken: %s", user.SessionToken)
+	models.LogInfo("Session token verification: %s%s%s", stColor, stMatchString, Colors.Reset)
+	models.LogInfo("Cookie CSRF token: %s", csrf.Value)
+	models.LogInfo("Header CSRF token: %s", csrfToken)
+	models.LogInfo("User CSRF token: %s", user.CSRFToken)
+	models.LogInfo("CSRF token verification: %s%s%s", csrfColor, csrfMatchString, Colors.Reset)
 
 	return success
 }
 
 func (m *CookieModel) UpdateCookies(user *models.User, sessionToken, csrfToken string, expires time.Time) error {
 	if m == nil || m.DB == nil {
-		fmt.Printf(ErrorMsgs.UserModel, "UpdateCookies", user.Username)
-		return errors.New("UserModel or DB is nil")
+		models.LogError("CookieModel or DB is nil in UpdateCookies", nil, "Username:", user.Username)
+		return errors.New("UserModel or DB is nil in UpdateCookies")
 	}
 	var stmt string
 	fmt.Printf(Colors.Blue+"Updating DB Cookies for: "+Colors.Text+"%v\n"+Colors.Reset, user.Username)
 	stmt = "UPDATE Users SET SessionToken = ?, CsrfToken = ?, CookiesExpire = ? WHERE Username = ?"
 	result, err := m.DB.Exec(stmt, sessionToken, csrfToken, expires, user.Username)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update cookies for user %s: %w", user.Username, err)
 	}
 	rows, _ := result.RowsAffected()
-	dbUpdated := "Failed!"
-	dbUpdatedColor := Colors.Red
 	if rows > 0 {
-		dbUpdated = "Success!"
+		dbUpdated = "✔ Success!"
 		dbUpdatedColor = Colors.Green
 	}
-	fmt.Printf(Colors.Blue+"Database update: "+dbUpdatedColor+"%v"+Colors.Reset+"\n", dbUpdated)
+	models.LogInfo("Updating cookies for user: %s%s", user.Username, successFail)
 
-	return err
+	return nil
 }
 
 func (m *CookieModel) DeleteCookies(w http.ResponseWriter, user *models.User) error {
@@ -137,16 +140,14 @@ func (m *CookieModel) DeleteCookies(w http.ResponseWriter, user *models.User) er
 	stmt := "UPDATE Users SET SessionToken = '', CsrfToken = '' WHERE Username = ?"
 	result, err := m.DB.Exec(stmt, user.Username)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete cookies for user %s: %w", user.Username, err)
 	}
 	rows, _ := result.RowsAffected()
-	dbUpdated := "Failed!"
-	dbUpdatedColor := Colors.Red
 	if rows > 0 {
-		dbUpdated = "Success!"
+		dbUpdated = "✔ Success!"
 		dbUpdatedColor = Colors.Green
 	}
-	log.Printf(Colors.Blue+"Database update: "+dbUpdatedColor+"%v"+Colors.Reset+"\n", dbUpdated)
+	models.LogInfo("Deleting cookies for user: %s%s", user.Username, successFail)
 	// Set Session, Username, and CSRF Token cookies
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
@@ -166,5 +167,5 @@ func (m *CookieModel) DeleteCookies(w http.ResponseWriter, user *models.User) er
 		Expires:  expires,
 		HttpOnly: false,
 	})
-	return err
+	return nil
 }

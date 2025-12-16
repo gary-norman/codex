@@ -3,7 +3,6 @@ package sqlite
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	"github.com/gary-norman/forum/internal/models"
 )
@@ -21,11 +20,11 @@ func (m *ModModel) All() ([]models.Mod, error) {
 	stmt := "SELECT * FROM Mods ORDER BY ID DESC"
 	rows, queryErr := m.DB.Query(stmt)
 	if queryErr != nil {
-		return nil, fmt.Errorf(ErrorMsgs.Query, "Mods", queryErr)
+		return nil, fmt.Errorf("failed to query all mods: %w", queryErr)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, "rows", "All")
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 
@@ -50,11 +49,11 @@ func (m *ModModel) GetModdedChannelsForUser(models.UUIDField) ([]models.Mod, err
 	stmt := "SELECT * From Channels WHERE ID IN (SELECT ChannelID FROM Mods WHERE UserID = ?)"
 	rows, queryErr := m.DB.Query(stmt)
 	if queryErr != nil {
-		return nil, fmt.Errorf(ErrorMsgs.Query, "Mods", queryErr)
+		return nil, fmt.Errorf("failed to query modded channels for user: %w", queryErr)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, "rows", "All")
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 
@@ -78,7 +77,7 @@ func (m *ModModel) GetModdedChannelID(ID models.UUIDField) ([]int64, error) {
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "ModSearch", closeErr)
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 
@@ -102,7 +101,7 @@ func (m *ModModel) GetModerator(ID int64) ([]models.UUIDField, error) {
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "ModSearch", closeErr)
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 
@@ -126,8 +125,7 @@ func parseModeratorRow(row *sql.Row) (*models.Mod, error) {
 		&mod.ChannelID,
 		&mod.Created,
 	); err != nil {
-		log.Printf(ErrorMsgs.Query, "GetUserFromId", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to scan moderator row: %w", err)
 	}
 	models.UpdateTimeSince(&mod)
 	return &mod, nil
@@ -142,8 +140,7 @@ func parseModeratorRows(rows *sql.Rows) (*models.Mod, error) {
 		&mod.ChannelID,
 		&mod.Created,
 	); err != nil {
-		log.Printf(ErrorMsgs.Query, "GetUserFromId", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to scan moderator row: %w", err)
 	}
 	models.UpdateTimeSince(&mod)
 	return &mod, nil

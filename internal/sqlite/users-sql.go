@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/gary-norman/forum/internal/models"
@@ -23,64 +22,57 @@ func CountUsers(db *sql.DB) (int, error) {
 	return count, nil
 }
 
+// Insert adds a new user to the database
 func (m *UserModel) Insert(id models.UUIDField, username, email, avatar, banner, description, userType, sessionToken, crsfToken, password string) error {
-	// FIXME this prepare statement is unnecessary as it is not used in a loop
-	stmt, insertErr := m.DB.Prepare("INSERT INTO Users (ID, Username, EmailAddress, Avatar, Banner, Description, UserType, Created, IsFlagged, SessionToken, CsrfToken, HashedPassword) VALUES (?, ?, ?, ?, ?, ?, ?, DateTime('now'), 0, ?, ?, ?)")
-	if insertErr != nil {
-		log.Printf(ErrorMsgs.Query, username, insertErr)
-	}
-	defer func(stmt *sql.Stmt) {
-		closErr := stmt.Close()
-		if closErr != nil {
-			log.Printf(ErrorMsgs.Close, "stmt", "insert", closErr)
-		}
-	}(stmt) // Prepared statements take up server resources and should be closed after use.
-	_, err := stmt.Exec(id, username, email, avatar, banner, description, userType, sessionToken, crsfToken, password)
+	// Note: Direct Exec() is more efficient than Prepare() for single-use queries
+	query := "INSERT INTO Users (ID, Username, EmailAddress, Avatar, Banner, Description, UserType, Created, IsFlagged, SessionToken, CsrfToken, HashedPassword) VALUES (?, ?, ?, ?, ?, ?, ?, DateTime('now'), 0, ?, ?, ?)"
+
+	_, err := m.DB.Exec(query, id, username, email, avatar, banner, description, userType, sessionToken, crsfToken, password)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to insert user %s: %w", username, err)
 	}
+
+	models.LogInfo("User created: %s", username)
 	return nil
 }
 
 func (m *UserModel) Edit(user *models.User) error {
-	stmt, prepErr := m.DB.Prepare("UPDATE Users SET Username = ?, EmailAddress = ?, HashedPassword = ?, SessionToken = ?, CsrfToken = ?, Avatar = ?, Banner = ?, Description = ? WHERE ID = ?")
-	if prepErr != nil {
-		log.Printf(ErrorMsgs.Query, "Users", prepErr)
-	}
-	defer func(stmt *sql.Stmt) {
-		closErr := stmt.Close()
-		if closErr != nil {
-			log.Printf(ErrorMsgs.Close, "stmt", "edit", closErr)
-		}
-	}(stmt) // Prepared statements take up server resources and should be closed after use.
-	_, err := stmt.Exec(user.Username, user.Email, user.HashedPassword, user.SessionToken, user.CSRFToken, user.Avatar, user.Banner, user.Description, user.ID)
+	query := "UPDATE Users SET Username = ?, EmailAddress = ?, HashedPassword = ?, SessionToken = ?, CsrfToken = ?, Avatar = ?, Banner = ?, Description = ? WHERE ID = ?"
+
+	result, err := m.DB.Exec(query, user.Username, user.Email, user.HashedPassword, user.SessionToken, user.CSRFToken, user.Avatar, user.Banner, user.Description, user.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update user %s: %w", user.Username, err)
 	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		models.LogWarn("User update affected 0 rows: %s", user.Username)
+	}
+
+	models.LogInfo("User updated: %s", user.Username)
 	return nil
 }
 
 func (m *UserModel) Delete(user *models.User) error {
-	stmt, prepErr := m.DB.Prepare("DELETE FROM Users WHERE ID = ?")
-	if prepErr != nil {
-		log.Printf(ErrorMsgs.Query, "Users", prepErr)
-	}
-	defer func(stmt *sql.Stmt) {
-		closErr := stmt.Close()
-		if closErr != nil {
-			log.Printf(ErrorMsgs.Close, "stmt", "delete", closErr)
-		}
-	}(stmt) // Prepared statements take up server resources and should be closed after use.
-	_, err := stmt.Exec(user.ID)
+	query := "DELETE FROM Users WHERE ID = ?"
+
+	result, err := m.DB.Exec(query, user.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to delete user %s: %w", user.Username, err)
 	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		models.LogWarn("User delete affected 0 rows: %s", user.Username)
+	}
+
+	models.LogInfo("User deleted: %s", user.Username)
 	return nil
 }
 
 func (m *UserModel) GetUserFromLogin(login, calledBy string) (*models.User, error) {
 	if m == nil || m.DB == nil {
-		return nil, fmt.Errorf(ErrorMsgs.UserModel, "GetUserFromLogin", login)
+		return nil, fmt.Errorf("error connecting to database called by: %s", calledBy)
 	}
 	username, email := login, login
 	var loginType string
@@ -96,17 +88,17 @@ func (m *UserModel) GetUserFromLogin(login, calledBy string) (*models.User, erro
 	case "username":
 		user, err := m.GetUserByUsername(username, "GetUserFromLogin")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get user by username: %w", err)
 		} else {
-			log.Printf(ErrorMsgs.KeyValuePair, "Successfully found user by username", user.Username)
+			models.LogInfo("Successfully found user by username: %s", user.Username)
 			return user, nil
 		}
 	case "email":
 		user, err := m.GetUserByEmail(email, "GetUserFromLogin")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get user by email: %w", err)
 		} else {
-			log.Printf(ErrorMsgs.KeyValuePair, "Successfully found user by email", user.Username)
+			models.LogInfo("Successfully found user by email: %s", user.Username)
 			return user, nil
 		}
 	default:
@@ -123,13 +115,12 @@ func (m *UserModel) QueryUserNameExists(username string) (string, bool, error) {
 	var count int
 	queryErr := m.DB.QueryRow("SELECT COUNT(*) FROM Users WHERE Username = ?", username).Scan(&count)
 	if queryErr != nil {
-		log.Printf(ErrorMsgs.Query, username, queryErr)
-		return "", false, queryErr
+		return "", false, fmt.Errorf("failed to query user by username: %w", queryErr)
 	}
 	if count > 0 {
-		return "username", true, queryErr
+		return "username", true, nil
 	}
-	return "", false, queryErr
+	return "", false, nil
 }
 
 func (m *UserModel) QueryUserEmailExists(email string) (string, bool, error) {
@@ -140,13 +131,12 @@ func (m *UserModel) QueryUserEmailExists(email string) (string, bool, error) {
 	var count int
 	queryErr := m.DB.QueryRow("SELECT COUNT(*) FROM Users WHERE EmailAddress = ?", email).Scan(&count)
 	if queryErr != nil {
-		log.Printf(ErrorMsgs.Query, email, queryErr)
-		return "", false, queryErr
+		return "", false, fmt.Errorf("failed to query user by email: %w", queryErr)
 	}
 	if count > 0 {
-		return "username", true, queryErr
+		return "email", true, nil
 	}
-	return "", false, queryErr
+	return "", false, nil
 }
 
 // TODO unify these functions to accept parameters
@@ -154,22 +144,13 @@ func (m *UserModel) QueryUserEmailExists(email string) (string, bool, error) {
 func (m *UserModel) GetUserByUsername(username, calledBy string) (*models.User, error) {
 	username = strings.TrimSpace(username)
 	if m == nil || m.DB == nil {
-		log.Printf(ErrorMsgs.UserModel, "GetUserByUsername", username)
+		return nil, fmt.Errorf("database not initialized in GetUserByUsername for %s", username)
 	}
-	// Query to fetch user data by username
-	stmt, prepErr := m.DB.Prepare("SELECT ID, Username, EmailAddress, Avatar, Banner, Description, Usertype, Created, Updated, IsFlagged, SessionToken, CSRFToken, HashedPassword FROM Users WHERE Username = ? LIMIT 1")
-	if prepErr != nil {
-		log.Printf(ErrorMsgs.Query, username, prepErr)
-	}
-	defer func(stmt *sql.Stmt) {
-		closErr := stmt.Close()
-		if closErr != nil {
-			log.Printf(ErrorMsgs.Close, "stmt", "getUserByUsername", closErr)
-		}
-	}(stmt) // Prepared statements take up server resources and should be closed after use.
-	// Create a User instance to store the result
+
+	query := "SELECT ID, Username, EmailAddress, Avatar, Banner, Description, Usertype, Created, Updated, IsFlagged, SessionToken, CSRFToken, HashedPassword FROM Users WHERE Username = ? LIMIT 1"
 	var user models.User
-	queryErr := stmt.QueryRow(username).Scan(
+
+	err := m.DB.QueryRow(query, username).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
@@ -183,11 +164,12 @@ func (m *UserModel) GetUserByUsername(username, calledBy string) (*models.User, 
 		&user.SessionToken,
 		&user.CSRFToken,
 		&user.HashedPassword)
-	if queryErr != nil {
-		if errors.Is(queryErr, sql.ErrNoRows) {
-			return nil, fmt.Errorf(ErrorMsgs.NoRows, username, calledBy, queryErr)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("user not found: %s: %w", username, err)
 		}
-		return nil, fmt.Errorf(ErrorMsgs.Query, username, queryErr)
+		return nil, fmt.Errorf("failed to get user by username %s: %w", username, err)
 	}
 
 	return &user, nil
@@ -196,32 +178,22 @@ func (m *UserModel) GetUserByUsername(username, calledBy string) (*models.User, 
 func (m *UserModel) GetUserByEmail(email, calledBy string) (*models.User, error) {
 	email = strings.TrimSpace(email)
 	if m == nil || m.DB == nil {
-		log.Printf(ErrorMsgs.UserModel, "GetUserByEmail", email)
+		return nil, fmt.Errorf("database not initialized in GetUserByEmail for %s", email)
 	}
-	// Query to fetch user data by username
-	stmt, prepErr := m.DB.Prepare("SELECT ID, HashedPassword, EmailAddress FROM Users WHERE EmailAddress = ? LIMIT 1")
-	if prepErr != nil {
-		log.Fatal(ErrorMsgs.Query, email, prepErr)
-	}
-	defer func(stmt *sql.Stmt) {
-		closErr := stmt.Close()
-		if closErr != nil {
-			// FIXME this error
-			log.Printf(ErrorMsgs.Close, "stmt", "getUserByEmail")
-		}
-	}(stmt)
-	// Create a User instance to store the result
+
+	query := "SELECT ID, HashedPassword, EmailAddress FROM Users WHERE EmailAddress = ? LIMIT 1"
 	var user models.User
-	queryErr := stmt.QueryRow(email).Scan(
+
+	err := m.DB.QueryRow(query, email).Scan(
 		&user.ID,
 		&user.HashedPassword,
 		&user.Email)
-	fmt.Printf(ErrorMsgs.Query, email, queryErr)
-	if queryErr != nil {
-		if errors.Is(queryErr, sql.ErrNoRows) {
-			return nil, fmt.Errorf(ErrorMsgs.NoRows, email, calledBy, queryErr)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("user not found by email: %s: %w", email, err)
 		}
-		return nil, fmt.Errorf(ErrorMsgs.Query, email, queryErr)
+		return nil, fmt.Errorf("failed to get user by email %s: %w", email, err)
 	}
 
 	return &user, nil
@@ -246,8 +218,7 @@ func (m *UserModel) GetUserByID(ID models.UUIDField) (models.User, error) {
 		&u.CSRFToken,
 		&u.HashedPassword)
 	if err != nil {
-		log.Printf(ErrorMsgs.Query, "GetUserByID", err)
-		return u, err
+		return u, fmt.Errorf("failed to get user by ID %s: %w", ID, err)
 	}
 	models.UpdateTimeSince(&u)
 	return u, nil
@@ -284,11 +255,11 @@ func (m *UserModel) GetSingleUserValue(ID models.UUIDField, searchColumn, output
 	)
 	rows, queryErr := m.DB.Query(stmt, ID)
 	if queryErr != nil {
-		return "", fmt.Errorf(ErrorMsgs.Query, "GetSingleUserValue", queryErr)
+		return "", fmt.Errorf("failed to query user for column %s: %w", searchColumn, queryErr)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, "rows", "All")
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 	var user models.User
@@ -334,11 +305,11 @@ func (m *UserModel) All() ([]*models.User, error) {
 	stmt := "SELECT ID, Username, EmailAddress, Avatar, Banner, Description, Usertype, Created, Updated, IsFlagged, SessionToken, CSRFToken, HashedPassword FROM Users ORDER BY ID DESC"
 	rows, queryErr := m.DB.Query(stmt)
 	if queryErr != nil {
-		return nil, fmt.Errorf(ErrorMsgs.Query, "Users", queryErr)
+		return nil, fmt.Errorf("failed to query all users: %w", queryErr)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, "rows", "All")
+			models.LogWarn("Failed to close rows: %v", closeErr)
 		}
 	}()
 
@@ -371,8 +342,7 @@ func parseUserRows(rows *sql.Rows) (*models.User, error) {
 		&user.CSRFToken,
 		&user.HashedPassword,
 	); err != nil {
-		log.Printf(ErrorMsgs.Query, "parseUserRows", err)
-		return nil, err
+		return nil, fmt.Errorf("Error parsing UserRows: %w", err)
 	}
 	models.UpdateTimeSince(&user)
 	return &user, nil
@@ -396,8 +366,7 @@ func parseUserRow(row *sql.Row) (*models.User, error) {
 		&user.CSRFToken,
 		&user.HashedPassword,
 	); err != nil {
-		log.Printf(ErrorMsgs.Query, "parseUserRow", err)
-		return nil, err
+		return nil, fmt.Errorf("Error parsing UserRow: %w", err)
 	}
 	models.UpdateTimeSince(&user)
 	return &user, nil
