@@ -37,12 +37,16 @@ function sendEvent(eventName, payload) {
 
 export function connectWebSocket(otp) {
     if (isConnecting || (connection && connection.readyState === WebSocket.OPEN)) {
+        console.log("⚠️ Already connecting or connected");
         return;
     }
 
     isConnecting = true;
 
-    connection = new WebSocket("ws://localhost:8888/ws?otp=" + otp);
+    const wsUrl = `ws://localhost:8888/ws?otp=${otp}`;
+    console.log("🚀 Attempting to connect to:", wsUrl);
+
+    connection = new WebSocket(wsUrl);
 
     connection.onopen = function() {
         console.log("✅ WebSocket OPEN - readyState:", connection.readyState);
@@ -50,11 +54,10 @@ export function connectWebSocket(otp) {
     };
 
     connection.onmessage = function(evt) {
+        console.log("📨 Message received:", evt.data);
         const eventData = JSON.parse(evt.data);
-
         const event = Object.assign(new Event, eventData);
-
-        routeEvent(event); 
+        routeEvent(event);
     };
 
     connection.onerror = function(error) {
@@ -69,36 +72,54 @@ export function connectWebSocket(otp) {
         console.log("Close reason:", event.reason);
         console.log("Was clean:", event.wasClean);
         isConnecting = false;
+        connection = null;
     };
 }
 
-// In your main JS file that runs on every page
-async function initWebSocket() {
+// NEW: Function to initialize WebSocket for already-logged-in users
+export async function initWebSocket() {
     try {
+        console.log("🔑 Fetching OTP for authenticated user...");
+
         const response = await fetch('/api/ws-otp', {
-            credentials: 'include' // Include cookies for auth
+            credentials: 'include', // Send cookies
+            headers: {
+                'Accept': 'application/json'
+            }
         });
 
-        if (response.ok) {
-            const data = await response.json();
-            console.log('Got OTP for WebSocket:', data.otp);
-            connectWebSocket(data.otp);
+        console.log("📥 OTP fetch response status:", response.status);
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                console.log("ℹ️ User not authenticated, skipping WebSocket");
+            } else {
+                console.error("❌ Failed to fetch OTP:", response.status);
+            }
+            return;
         }
+
+        const data = await response.json();
+        console.log("✅ OTP received:", data.otp);
+        connectWebSocket(data.otp);
+
     } catch (error) {
-        console.error('Failed to get WebSocket OTP:', error);
+        console.error("❌ Error fetching OTP:", error);
     }
 }
 
-// Call this when page loads if user is logged in
-if (document.cookie.includes('session_token')) {
+// Call on page load for already-logged-in users
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("🔄 Page loaded, checking for existing session...");
     void initWebSocket();
-}
+});
 
-
+// Existing sendMessage function
 document.addEventListener("DOMContentLoaded", () => {
-
     const sendMessageButton = document.getElementById("sendMessage");
-    sendMessageButton.addEventListener("click", sendMessage);
+    if (sendMessageButton) {
+        sendMessageButton.addEventListener("click", sendMessage);
+    }
 });
 
 export function sendMessage() {
@@ -106,8 +127,6 @@ export function sendMessage() {
 
     if (messageInput != null) {
         sendEvent("send_message", messageInput.value);
-        return
+        return;
     }
-
-
 }
