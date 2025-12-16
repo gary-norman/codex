@@ -109,9 +109,14 @@ func (c *Client) writeMessages() {
 			log.Println("ping")
 
 			//Send a ping to the client
-			if err := c.connection.WriteMessage(websocket.PingMessage, []byte(``)); err != nil {
+			if err := c.connection.WriteMessage(websocket.PingMessage, nil); err != nil {
+				// Check if connection is already closed
+				if websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+					log.Println("Connection closed, stopping ping routine")
+					return
+				}
 				log.Println("Error writing ping:", err)
-				return
+				return // Stop the ping routine on any error
 			}
 		}
 	}
