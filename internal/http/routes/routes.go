@@ -21,7 +21,7 @@ func NewRouter(app *app.App) http.Handler {
 
 	// Core routes
 	mux.HandleFunc("/ws", r.Websocket.ServeWebsocket)
-	mux.HandleFunc("/api/ws-otp", r.Auth.GetWebsocketOTP)
+	mux.Handle("GET /api/ws-otp", mw.WithUser(http.HandlerFunc(r.Auth.GetWebsocketOTP), r.App))
 	mux.HandleFunc("POST /register", r.Auth.Register)
 	mux.HandleFunc("POST /login", r.Auth.Login)
 	mux.HandleFunc("POST /logout", r.Auth.Logout)
