@@ -22,6 +22,8 @@ func NewRouter(app *app.App, loggerPool *workers.LoggerPool) http.Handler {
 	mux.Handle("/db/", http.StripPrefix("/db/", http.FileServer(http.Dir("./db"))))
 
 	// Core routes
+	mux.HandleFunc("/ws", r.Websocket.ServeWebsocket)
+	mux.Handle("GET /api/ws-otp", mw.WithUser(http.HandlerFunc(r.Auth.GetWebsocketOTP), r.App))
 	mux.HandleFunc("POST /register", r.Auth.Register)
 	mux.HandleFunc("POST /login", r.Auth.Login)
 	mux.HandleFunc("POST /logout", r.Auth.Logout)

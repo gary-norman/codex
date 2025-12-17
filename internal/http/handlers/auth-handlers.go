@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	mw "github.com/gary-norman/forum/internal/http/middleware"
+	"log"
 	"net/http"
 	"regexp"
 
@@ -148,6 +150,24 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
+func (h *AuthHandler) GetWebsocketOTP(w http.ResponseWriter, r *http.Request) {
+	// Verify user is authenticated
+	_, ok := mw.GetUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Generate OTP
+	otp := h.App.Websocket.OTPs.NewOTP()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]any{
+		"otp": otp.Key,
+	})
+}
+
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	// Parse JSON from the request body
@@ -201,6 +221,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
+
+		//adding OTP to a logged-in user for websocket authentication
+		otp := h.App.Websocket.OTPs.NewOTP()
+
 		// Respond with a successful login message
 		models.LogInfoWithContext(ctx, ErrorMsgs.LoginSuccess, user.Username, expires)
 		w.Header().Set("Content-Type", "application/json")
@@ -208,6 +232,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		encErr := json.NewEncoder(w).Encode(map[string]any{
 			"code":    http.StatusOK,
 			"message": fmt.Sprintf("Welcome, %s! Login successful.", user.Username),
+			"otp":     otp.Key,
 		})
 		if encErr != nil {
 			models.LogErrorWithContext(ctx, "Failed to encode login success response", encErr)

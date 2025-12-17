@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"database/sql"
 	"fmt"
+	"github.com/gary-norman/forum/internal/http/websocket"
 	"log"
 	"os"
 	"strings"
@@ -86,24 +87,25 @@ func initConfig() *Config {
 }
 
 type App struct {
-	DB             *sql.DB // Store DB reference for cleanup
-	DBCircuit      *patterns.CircuitBreaker
-	Users          *sqlite.UserModel
-	Posts          *sqlite.PostModel
-	Reactions      *sqlite.ReactionModel
-	Saved          *sqlite.SavedModel
-	Mods           *sqlite.ModModel
-	Comments       *sqlite.CommentModel
-	Images         *sqlite.ImageModel
-	Channels       *sqlite.ChannelModel
-	Flags          *sqlite.FlagModel
-	Loyalty        *sqlite.LoyaltyModel
-	Memberships    *sqlite.MembershipModel
-	Muted          *sqlite.MutedChannelModel
-	Cookies        *sqlite.CookieModel
-	Rules          *sqlite.RuleModel
-	Chats          *sqlite.ChatModel
-	Paths          models.ImagePaths
+	DB          *sql.DB // Store DB reference for cleanup
+	DBCircuit   *patterns.CircuitBreaker
+	Users       *sqlite.UserModel
+	Posts       *sqlite.PostModel
+	Reactions   *sqlite.ReactionModel
+	Saved       *sqlite.SavedModel
+	Mods        *sqlite.ModModel
+	Comments    *sqlite.CommentModel
+	Images      *sqlite.ImageModel
+	Channels    *sqlite.ChannelModel
+	Flags       *sqlite.FlagModel
+	Loyalty     *sqlite.LoyaltyModel
+	Memberships *sqlite.MembershipModel
+	Muted       *sqlite.MutedChannelModel
+	Cookies     *sqlite.CookieModel
+	Rules       *sqlite.RuleModel
+	Chats       *sqlite.ChatModel
+	Paths       models.ImagePaths
+	Websocket   *websocket.Manager
 }
 
 func NewApp(db *sql.DB, imagePath string) *App {
@@ -128,7 +130,7 @@ func NewApp(db *sql.DB, imagePath string) *App {
 		Cookies:     &sqlite.CookieModel{DB: db},
 		Rules:       &sqlite.RuleModel{DB: db},
 		Chats:       &sqlite.ChatModel{DB: db},
-
+		Websocket:   nil, // Will be set later by routes
 		Paths: models.ImagePaths{
 			Channel: imagePath + "channel-images/",
 			Post:    imagePath + "post-images/",

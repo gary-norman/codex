@@ -56,6 +56,7 @@
   <script type="module" src="/assets/js/search.js" defer></script>
   <script type="module" src="/assets/js/fetch_and_navigate.js" defer></script>
   <script type="module" src="/assets/js/colour_scheme.js" defer></script>
+  <script type="module" src="/assets/js/websocket.js" defer></script>
   <script type="module" src="/assets/js/authentication.js" defer></script>
   <script type="module" src="/assets/js/channel_rules.js" defer></script>
   <script type="module" src="/assets/js/file_uploader.js" defer></script>
@@ -458,6 +459,13 @@
     </aside>
 
     <main class="main-content">
+      <div id="web-socket">
+        <label class="small" for="messageInput">Your Message:</label>
+        <input type="text" id="messageInput" placeholder="Enter a message">
+        <button id="sendMessage">Send Message</button>
+
+        <div id="outputMessage"></div>
+      </div>
       {{/* SECTION ---------- home page ---------- */}}
       {{ if eq .ErrorPage true}}
       <div id="home-page" class="feeds-wrapper active-feed error-400">

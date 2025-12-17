@@ -8,6 +8,7 @@ import {
   pickTheme,
   themeList,
 } from "./consoleThemes.js";
+import {connectWebSocket} from "./websocket.js";
 
 // registration form
 const regForm = document.querySelector("#form-register");
@@ -296,6 +297,12 @@ if (loginForm) {
       }
 
       showInlineNotification(notifierLogin, "", data.message, true, "dummy");
+
+      // Connect WebSocket with OTP
+      if (data?.otp) {
+        connectWebSocket(data.otp);
+      }
+
       setTimeout(() => {
         window.location.href = "/";
       }, 2000);

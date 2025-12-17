@@ -1,22 +1,25 @@
 package routes
 
 import (
+	"context"
 	"github.com/gary-norman/forum/internal/app"
 	h "github.com/gary-norman/forum/internal/http/handlers"
+	"github.com/gary-norman/forum/internal/http/websocket"
 )
 
 type RouteHandler struct {
-	App      *app.App
-	Auth     *h.AuthHandler
-	Channel  *h.ChannelHandler
-	Comment  *h.CommentHandler
-	Home     *h.HomeHandler
-	Post     *h.PostHandler
-	Reaction *h.ReactionHandler
-	Search   *h.SearchHandler
-	Session  *h.SessionHandler
-	User     *h.UserHandler
-	Mod      *h.ModHandler
+	App       *app.App
+	Auth      *h.AuthHandler
+	Channel   *h.ChannelHandler
+	Comment   *h.CommentHandler
+	Home      *h.HomeHandler
+	Post      *h.PostHandler
+	Reaction  *h.ReactionHandler
+	Search    *h.SearchHandler
+	Session   *h.SessionHandler
+	User      *h.UserHandler
+	Mod       *h.ModHandler
+	Websocket *websocket.Manager
 }
 
 func NewCommentHandler(app *app.App, reaction *h.ReactionHandler) *h.CommentHandler {
@@ -74,7 +77,7 @@ func NewSessionHandler(app *app.App) *h.SessionHandler {
 	}
 }
 
-func NewAuthHandler(app *app.App, session *h.SessionHandler) *h.AuthHandler {
+func NewAuthHandler(app *app.App, session *h.SessionHandler, ws *websocket.Manager) *h.AuthHandler {
 	return &h.AuthHandler{
 		App:     app,
 		Session: session,
@@ -96,12 +99,17 @@ func NewModHandler(app *app.App, channel *h.ChannelHandler, user *h.UserHandler)
 }
 
 func NewRouteHandler(app *app.App) *RouteHandler {
-	// Step 1: Create top-level (flat) handlers without nested deps first
+	// Step 1: Create websocket manager FIRST
+	websocketHandler := websocket.NewManager(context.Background())
+
+	// Step 2: Store it in app IMMEDIATELY
+	app.Websocket = websocketHandler
+
+	// Step 3: Create top-level (flat) handlers without nested deps first
 	sessionHandler := NewSessionHandler(app)
 	reactionHandler := NewReactionHandler(app)
-	authHandler := NewAuthHandler(app, sessionHandler)
 
-	// Step 2: Create nested handlers with their deps injected
+	// Step 4: Create nested handlers with their deps injected
 	commentHandler := NewCommentHandler(app, reactionHandler)
 	channelHandler := NewChannelHandler(app, commentHandler, reactionHandler)
 	userHandler := NewUserHandler(app, channelHandler, commentHandler, reactionHandler)
@@ -110,18 +118,21 @@ func NewRouteHandler(app *app.App) *RouteHandler {
 	modHandler := NewModHandler(app, channelHandler, userHandler)
 	searchHandler := NewSearchHandler(app)
 
+	// Moved authHandler down as need websocketHandler
+	authHandler := NewAuthHandler(app, sessionHandler, websocketHandler)
 	// Step 3: Return fully wired router
 	return &RouteHandler{
-		App:      app,
-		Auth:     authHandler,
-		Channel:  channelHandler,
-		Comment:  commentHandler,
-		Home:     homeHandler,
-		Post:     postHandler,
-		Reaction: reactionHandler,
-		Search:   searchHandler,
-		Session:  sessionHandler,
-		User:     userHandler,
-		Mod:      modHandler,
+		App:       app,
+		Auth:      authHandler,
+		Channel:   channelHandler,
+		Comment:   commentHandler,
+		Home:      homeHandler,
+		Post:      postHandler,
+		Reaction:  reactionHandler,
+		Search:    searchHandler,
+		Session:   sessionHandler,
+		User:      userHandler,
+		Mod:       modHandler,
+		Websocket: websocketHandler,
 	}
 }
