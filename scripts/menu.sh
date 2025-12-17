@@ -17,16 +17,19 @@ CODEX_HIGHLIGHT_PINK="\033[38;2;0;0;0;48;2;234;79;146m"
 if [[ -n "$TERM_PROGRAM" ]] && [[ "$TERM_PROGRAM" =~ (WezTerm|Alacritty|kitty|iTerm) ]]; then
   # Known terminals that support Nerd Fonts well
   DOCKER_ICON="${BLUE}󰡨${CODEX_GREEN}"
+  COMPOSE_ICON="${TEAL}󰡨${CODEX_GREEN}"
   SCRIPTS_ICON="${NC}󰯂${CODEX_GREEN}"
   ENTER_KEY=" 󱞦 Enter "
 elif fc-list 2>/dev/null | grep -qi "nerd"; then
   # Check if any Nerd Font is installed via fontconfig
   DOCKER_ICON="${BLUE}󰡨${CODEX_GREEN}"
+  COMPOSE_ICON="${TEAL}󰡨${CODEX_GREEN}"
   SCRIPTS_ICON="${NC}󰯂${CODEX_GREEN}"
   ENTER_KEY=" 󱞦 Enter "
 else
   # Fallback to emoji
   DOCKER_ICON="🐳"
+  COMPOSE_ICON="🐙"
   SCRIPTS_ICON="📜"
   ENTER_KEY=" ⏎ Enter "
 fi
@@ -182,6 +185,43 @@ docker_menu() {
   done
 }
 
+# Docker Compose submenu
+compose_menu() {
+  local compose_options=("back" "compose-up" "compose-down" "compose-restart" "compose-logs" "compose-ps" "compose-build")
+  local compose_descs=("return to main menu" "start services (detached)" "stop and remove services" "restart services" "view service logs" "show service status" "build services")
+
+  while true; do
+    show_menu "Docker Compose Commands" compose_options compose_descs
+
+    case "$MENU_CHOICE" in
+      back|exit)
+        return
+        ;;
+      *)
+        clear
+        printf "${TEAL}Running target: ${CODEX_PINK}%s${NC}\n\n" "$MENU_CHOICE"
+
+        START=$(get_time_ms)
+        make --no-print-directory "$MENU_CHOICE"
+        EXIT_CODE=$?
+        END=$(get_time_ms)
+        DURATION=$((END - START))
+
+        printf "\n${CODEX_PINK}---------------------------------------------${NC}\n"
+        if [ $EXIT_CODE -eq 0 ]; then
+          printf "${GREEN}✓ Task completed${NC} in ${CODEX_PINK}%s${NC}\n" "$(format_duration $DURATION)"
+        else
+          printf "${RED}✗ Task failed${NC} (exit code: %d) after ${CODEX_PINK}%s${NC}\n" "$EXIT_CODE" "$(format_duration $DURATION)"
+        fi
+        printf "${CODEX_PINK}---------------------------------------------${NC}\n"
+
+        printf "\nPress ${CODEX_HIGHLIGHT_PINK}${ENTER_KEY}${NC} to return to menu..."
+        read -r dummy
+        ;;
+    esac
+  done
+}
+
 # Scripts submenu
 scripts_menu() {
   local scripts_options=("back" "install-scripts" "verify-scripts" "backup-scripts")
@@ -223,9 +263,10 @@ scripts_menu() {
 while true; do
   # Build main menu with proper color interpolation
   DOCKER_LABEL="${DOCKER_ICON} Docker"
+  COMPOSE_LABEL="${COMPOSE_ICON} Compose"
   SCRIPTS_LABEL="${SCRIPTS_ICON} Scripts"
-  main_options=("exit" "build" "run" "build-run" "migrate" "seed" "select-db" "$DOCKER_LABEL" "$SCRIPTS_LABEL")
-  main_descs=("quit this menu" "build the application" "run the application" "build and run the application" "run database migrations" "seed database with initial data" "select database environment" "Docker management" "script management")
+  main_options=("exit" "build" "run" "build-run" "migrate" "seed" "select-db" "$DOCKER_LABEL" "$COMPOSE_LABEL" "$SCRIPTS_LABEL")
+  main_descs=("quit this menu" "build the application" "run the application" "build and run the application" "run database migrations" "seed database with initial data" "select database environment" "Docker management" "docker-compose management" "script management")
 
   show_menu "make commands for <codex>" main_options main_descs
 
@@ -236,6 +277,9 @@ while true; do
       ;;
     "$DOCKER_LABEL")
       docker_menu
+      ;;
+    "$COMPOSE_LABEL")
+      compose_menu
       ;;
     "$SCRIPTS_LABEL")
       scripts_menu

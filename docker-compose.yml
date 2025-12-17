@@ -1,0 +1,38 @@
+services:
+  codex:
+    image: ${IMAGE:-samuishark/codex:latest}
+    container_name: ${CONTAINER:-codex}
+    restart: unless-stopped
+
+    ports:
+      - "${PORT:-8888}:8888"
+
+    volumes:
+      # Database persistence
+      - codex-db:/var/lib/db-codex
+      # User uploaded images
+      - codex-images:/app/db/userdata/images
+
+    environment:
+      - DB_ENV=${DB_ENV:-prod}
+      - DB_PATH=${DB_PATH:-/var/lib/db-codex/forum_database.db}
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8888/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    networks:
+      - codex-network
+
+volumes:
+  codex-db:
+    driver: local
+  codex-images:
+    driver: local
+
+networks:
+  codex-network:
+    driver: bridge
