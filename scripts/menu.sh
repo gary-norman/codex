@@ -147,8 +147,8 @@ show_menu() {
 
 # Docker submenu
 docker_menu() {
-  local docker_options=("back" "configure" "reset-config" "build-image" "run-container")
-  local docker_descs=("return to main menu" "configure Docker options" "reset configuration" "build Docker image" "run Docker container")
+  local docker_options=("back" "configure" "reset-config" "build-image" "run-container" "stop-container")
+  local docker_descs=("return to main menu" "configure Docker options" "reset configuration" "build Docker image" "run Docker container" "stop and remove container")
 
   while true; do
     show_menu "Docker Commands" docker_options docker_descs
