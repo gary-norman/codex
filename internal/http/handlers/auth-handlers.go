@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	mw "github.com/gary-norman/forum/internal/http/middleware"
-	"log"
 	"net/http"
 	"regexp"
 
