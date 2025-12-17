@@ -11,6 +11,7 @@ type RouteHandler struct {
 	App       *app.App
 	Auth      *h.AuthHandler
 	Channel   *h.ChannelHandler
+	Chat      *h.ChatHandler
 	Comment   *h.CommentHandler
 	Home      *h.HomeHandler
 	Post      *h.PostHandler
@@ -40,6 +41,12 @@ func NewChannelHandler(app *app.App, comment *h.CommentHandler, reaction *h.Reac
 		App:      app,
 		Comment:  comment,
 		Reaction: reaction,
+	}
+}
+
+func NewChatHandler(app *app.App) *h.ChatHandler {
+	return &h.ChatHandler{
+		App: app,
 	}
 }
 
@@ -105,9 +112,14 @@ func NewRouteHandler(app *app.App) *RouteHandler {
 	// Step 2: Store it in app IMMEDIATELY
 	app.Websocket = websocketHandler
 
+	// Step 3: Attach database models to websocket manager
+	websocketHandler.Chats = app.Chats
+	websocketHandler.Users = app.Users
+
 	// Step 3: Create top-level (flat) handlers without nested deps first
 	sessionHandler := NewSessionHandler(app)
 	reactionHandler := NewReactionHandler(app)
+	chatHandler := NewChatHandler(app)
 
 	// Step 4: Create nested handlers with their deps injected
 	commentHandler := NewCommentHandler(app, reactionHandler)
@@ -125,6 +137,7 @@ func NewRouteHandler(app *app.App) *RouteHandler {
 		App:       app,
 		Auth:      authHandler,
 		Channel:   channelHandler,
+		Chat:      chatHandler,
 		Comment:   commentHandler,
 		Home:      homeHandler,
 		Post:      postHandler,

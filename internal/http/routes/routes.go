@@ -24,6 +24,7 @@ func NewRouter(app *app.App, loggerPool *workers.LoggerPool) http.Handler {
 	// Core routes
 	mux.HandleFunc("/ws", r.Websocket.ServeWebsocket)
 	mux.Handle("GET /api/ws-otp", mw.WithUser(http.HandlerFunc(r.Auth.GetWebsocketOTP), r.App))
+	mux.Handle("POST /api/chats/create", mw.WithUser(http.HandlerFunc(r.Chat.CreateChat), r.App))
 	mux.HandleFunc("POST /register", r.Auth.Register)
 	mux.HandleFunc("POST /login", r.Auth.Login)
 	mux.HandleFunc("POST /logout", r.Auth.Logout)

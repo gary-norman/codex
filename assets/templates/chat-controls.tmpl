@@ -11,4 +11,18 @@
   {{ end }}
   </div>
 </div>
+
+<div class="sidebar-block ">
+<small class="padded">Start New Chat</small>
+<div class="side-panel-block">
+{{ range $dot.AllUsers }}
+{{ $user := . }}
+{{ if ne $user.ID $dot.CurrentUser.ID }}
+  <button class="chat-control btn-start-chat" data-user-online="true" data-user-id="{{ $user.ID }}" data-username="{{ $user.Username }}">
+    <span class="btn-posts">{{ $user.Username }}</span>
+  </button>
+  {{ end }}
+  {{ end }}
+  </div>
+</div>
 {{ end }}
