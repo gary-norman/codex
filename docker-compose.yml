@@ -1,6 +1,6 @@
 services:
   codex:
-    image: ${IMAGE:-samuishark/codex:latest}
+    image: ${IMAGE:-samuishark/codex}:${VERSION:-latest}
     container_name: ${CONTAINER:-codex}
     restart: unless-stopped
 

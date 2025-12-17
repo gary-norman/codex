@@ -14,12 +14,14 @@ NC="\033[0m"
 if [ -f .env ]; then
   # Read existing values
   IMAGE=$(grep '^IMAGE=' .env | cut -d'=' -f2)
+  VERSION=$(grep '^VERSION=' .env | cut -d'=' -f2)
   CONTAINER=$(grep '^CONTAINER=' .env | cut -d'=' -f2)
   PORT=$(grep '^PORT=' .env | cut -d'=' -f2)
 fi
 
 # Set defaults if not found
-IMAGE=${IMAGE:-samuishark/codex-v1.0}
+IMAGE=${IMAGE:-samuishark/codex}
+VERSION=${VERSION:-latest}
 CONTAINER=${CONTAINER:-codex}
 PORT=${PORT:-8888}
 
@@ -64,6 +66,7 @@ cat >.env <<EOF
 DB_ENV=$DB_ENV
 DB_PATH=$DB_PATH
 IMAGE=$IMAGE
+VERSION=$VERSION
 CONTAINER=$CONTAINER
 PORT=$PORT
 EOF

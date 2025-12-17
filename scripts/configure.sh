@@ -49,16 +49,12 @@ esac
 printf "${CODEX_PINK}---------------------------------------------${NC}\n"
 printf "${CODEX_GREEN}> configuring Docker build and run options...${NC}\n"
 printf "${CODEX_PINK}---------------------------------------------${NC}\n"
-read -rp "Enter base image name (default: samuishark/codex): " BASE_IMAGE
-BASE_IMAGE=${BASE_IMAGE:-samuishark/codex}
+read -rp "Enter image name (default: samuishark/codex): " IMAGE
+IMAGE=${IMAGE:-samuishark/codex}
 
-read -rp "Enter version (e.g., 1.1 for -v1.1): " VERSION
-if [ -n "$VERSION" ]; then
-  IMAGE="${BASE_IMAGE}-v${VERSION}"
-else
-  IMAGE="${BASE_IMAGE}"
-fi
-printf "${GREEN}✓ Full image name: ${CODEX_PINK}%s${NC}\n" "$IMAGE"
+read -rp "Enter version tag (e.g., 1.1, 2.0): " VERSION
+VERSION=${VERSION:-latest}
+printf "${GREEN}✓ Image tags: ${CODEX_PINK}%s:${VERSION}${NC} and ${CODEX_PINK}%s:latest${NC}\n" "$IMAGE" "$IMAGE"
 
 read -rp "Enter container name (default: codex): " CONTAINER
 CONTAINER=${CONTAINER:-codex}
@@ -71,6 +67,7 @@ cat >.env <<EOF
 DB_ENV=$DB_ENV
 DB_PATH=$DB_PATH
 IMAGE=$IMAGE
+VERSION=$VERSION
 CONTAINER=$CONTAINER
 PORT=$PORT
 EOF
@@ -79,7 +76,7 @@ printf "${GREEN}✓ configuration saved to ${CODEX_PINK}.env${NC}\n"
 printf "${CODEX_PINK}---------------------------------------------${NC}\n"
 printf "${CODEX_GREEN}Configuration Summary:${NC}\n"
 printf "${CODEX_GREEN}  Database: ${CODEX_PINK}%s${NC} (${CODEX_PINK}%s${NC})\n" "$DB_ENV" "$DB_PATH"
-printf "${CODEX_GREEN}  Image: ${CODEX_PINK}%s${NC}\n" "$IMAGE"
+printf "${CODEX_GREEN}  Image: ${CODEX_PINK}%s:%s${NC}\n" "$IMAGE" "$VERSION"
 printf "${CODEX_GREEN}  Container: ${CODEX_PINK}%s${NC}\n" "$CONTAINER"
 printf "${CODEX_GREEN}  Port: ${CODEX_PINK}%s${NC}\n" "$PORT"
 printf "${CODEX_PINK}---------------------------------------------${NC}\n"
