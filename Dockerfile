@@ -1,7 +1,7 @@
 # ----------------------
 # Stage 1: Build the app
 # ----------------------
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine3.23 AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -30,7 +30,7 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags="-s -w" -o bin/codex github.co
 # ----------------------
 # Stage 2: Runtime image
 # ----------------------
-FROM alpine:3.19
+FROM alpine:3.23
 
 # Install only runtime dependencies
 RUN apk add --no-cache \
