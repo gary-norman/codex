@@ -49,8 +49,16 @@ esac
 printf "${CODEX_PINK}---------------------------------------------${NC}\n"
 printf "${CODEX_GREEN}> configuring Docker build and run options...${NC}\n"
 printf "${CODEX_PINK}---------------------------------------------${NC}\n"
-read -rp "Enter image name (default: samuishark/codex-v1.0): " IMAGE
-IMAGE=${IMAGE:-samuishark/codex-v1.0}
+read -rp "Enter base image name (default: samuishark/codex): " BASE_IMAGE
+BASE_IMAGE=${BASE_IMAGE:-samuishark/codex}
+
+read -rp "Enter version (e.g., 1.1 for -v1.1): " VERSION
+if [ -n "$VERSION" ]; then
+  IMAGE="${BASE_IMAGE}-v${VERSION}"
+else
+  IMAGE="${BASE_IMAGE}"
+fi
+printf "${GREEN}✓ Full image name: ${CODEX_PINK}%s${NC}\n" "$IMAGE"
 
 read -rp "Enter container name (default: codex): " CONTAINER
 CONTAINER=${CONTAINER:-codex}
