@@ -81,16 +81,35 @@ build-image: ## build the Docker image
 		printf "$(GREEN)✓${CODEX_GREEN} build complete!$(NC) in $(CODEX_PINK)%s.%03d$(NC)s\n" "$$SEC" "$$MS" \
 	'
 
-run-container: ## run the Docker container
+run-container: ## run the Docker container (auto-removes existing container if present)
 	@bash -c '\
 		START=$$($(NOWMS)); \
 		printf "$(TEAL)> running Docker container $(NC)as $(CODEX_PINK)%s $(NC)from image: $(CODEX_PINK)%s $(NC)using port: $(CODEX_PINK)%s$(NC)\n" "$(CONTAINER)" "$(IMAGE)" "$(PORT)"; \
+		EXISTING=$$(docker ps -aq -f name=^$(CONTAINER)$$); \
+		if [ -n "$$EXISTING" ]; then \
+			printf "$(PEACH)⚠ Container $(CODEX_PINK)%s$(PEACH) already exists. Removing...$(NC)\n" "$(CONTAINER)"; \
+			docker stop $(CONTAINER) >/dev/null 2>&1 || true; \
+			docker rm $(CONTAINER) >/dev/null 2>&1; \
+			printf "$(GREEN)✓ Old container removed$(NC)\n"; \
+		fi; \
 		docker run -d -p $(PORT):8888 --name $(CONTAINER) $(IMAGE); \
 		STOP=$$($(NOWMS)); \
 		DIFF=$$((STOP - START)); \
 		SEC=$$((DIFF / 1000)); \
 		MS=$$((DIFF % 1000)); \
-		printf "$(GREEN)✓${CODEX_GREEN} task complete!$(NC)in $(CODEX_PINK)%s.%03d$(NC)s\n" "$$SEC" "$$MS" \
+		printf "$(GREEN)✓${CODEX_GREEN} task complete!$(NC) in $(CODEX_PINK)%s.%03d$(NC)s\n" "$$SEC" "$$MS" \
+	'
+
+stop-container: ## stop and remove the Docker container
+	@bash -c '\
+		printf "$(TEAL)> stopping and removing container: $(CODEX_PINK)%s$(NC)\n" "$(CONTAINER)"; \
+		EXISTING=$$(docker ps -aq -f name=^$(CONTAINER)$$); \
+		if [ -n "$$EXISTING" ]; then \
+			docker stop $(CONTAINER) 2>/dev/null && printf "$(GREEN)✓ Container stopped$(NC)\n" || true; \
+			docker rm $(CONTAINER) 2>/dev/null && printf "$(GREEN)✓ Container removed$(NC)\n" || true; \
+		else \
+			printf "$(YELLOW)⊘ No container named $(CODEX_PINK)%s$(YELLOW) found$(NC)\n" "$(CONTAINER)"; \
+		fi \
 	'
 
 install-scripts: ## install/update all scripts with correct permissions
