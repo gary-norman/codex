@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"encoding/json"
+	"github.com/gary-norman/forum/internal/models"
 	"github.com/gorilla/websocket"
 	"log"
 	"time"
@@ -16,15 +17,17 @@ type ClientList map[*Client]bool
 type Client struct {
 	connection *websocket.Conn
 	manager    *Manager
+	userID     models.UUIDField
 
 	// egress (means outgoing data) is used to avoid concurrent writes on the websocket connection
 	egress chan Event
 }
 
-func NewClient(conn *websocket.Conn, manager *Manager) *Client {
+func NewClient(conn *websocket.Conn, manager *Manager, userID models.UUIDField) *Client {
 	return &Client{
 		connection: conn,
 		manager:    manager,
+		userID:     userID,
 		egress:     make(chan Event),
 	}
 }

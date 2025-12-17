@@ -151,14 +151,14 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) GetWebsocketOTP(w http.ResponseWriter, r *http.Request) {
 	// Verify user is authenticated
-	_, ok := mw.GetUserFromContext(r.Context())
+	currentUser, ok := mw.GetUserFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	// Generate OTP
-	otp := h.App.Websocket.OTPs.NewOTP()
+	// Generate OTP with user ID
+	otp := h.App.Websocket.OTPs.NewOTP(currentUser.ID)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -222,7 +222,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		}
 
 		//adding OTP to a logged-in user for websocket authentication
-		otp := h.App.Websocket.OTPs.NewOTP()
+		otp := h.App.Websocket.OTPs.NewOTP(user.ID)
 
 		// Respond with a successful login message
 		models.LogInfoWithContext(ctx, ErrorMsgs.LoginSuccess, user.Username, expires)

@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"github.com/gary-norman/forum/internal/models"
 	"github.com/google/uuid"
 	"golang.org/x/net/context"
 	"time"
@@ -9,6 +10,7 @@ import (
 // OTP is a one-time password for websocket authentication
 type OTP struct {
 	Key     string
+	UserID  models.UUIDField
 	Created time.Time
 }
 
@@ -26,9 +28,10 @@ func NewRetentionMap(ctx context.Context, retentionPeriod time.Duration) Retenti
 }
 
 // NewOTP creates a new OTP and adds it to the retention map
-func (rm RetentionMap) NewOTP() OTP {
+func (rm RetentionMap) NewOTP(userID models.UUIDField) OTP {
 	o := OTP{
 		Key:     uuid.NewString(),
+		UserID:  userID,
 		Created: time.Now(),
 	}
 
@@ -36,14 +39,15 @@ func (rm RetentionMap) NewOTP() OTP {
 	return o
 }
 
-// VerifyOTP verifies if the OTP is a valid password and deletes it if so & returns true (or false if not valid)
-func (rm RetentionMap) VerifyOTP(otp string) bool {
-	if _, ok := rm[otp]; !ok {
-		return false //otp is not valid
+// VerifyOTP verifies if the OTP is a valid password and returns it (deleting from map), or returns false if not valid
+func (rm RetentionMap) VerifyOTP(otp string) (OTP, bool) {
+	otpObj, ok := rm[otp]
+	if !ok {
+		return OTP{}, false //otp is not valid
 	}
-	//if it does exist, it deletes the one-time password and returns true
+	//if it does exist, it deletes the one-time password and returns it
 	delete(rm, otp)
-	return true
+	return otpObj, true
 }
 
 // Retention checks for expired OTPs and removes them

@@ -1,14 +1,19 @@
 package websocket
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"golang.org/x/net/context"
 	"log"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/gary-norman/forum/internal/models"
+	"github.com/gary-norman/forum/internal/sqlite"
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 type Manager struct {
@@ -16,6 +21,8 @@ type Manager struct {
 	sync.RWMutex  //read/write lock in Go. It protects shared data when multiple goroutines access it, allowing many readers at the same time but only one writer at a time.
 	EventHandlers map[string]EventHandler
 	OTPs          RetentionMap
+	Chats         *sqlite.ChatModel
+	Users         *sqlite.UserModel
 }
 
 func NewManager(ctx context.Context) *Manager {
@@ -46,7 +53,8 @@ func (ws *Manager) ServeWebsocket(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Checking if OTP is valid")
 	//block websocket connection if no OTP is not valid
-	if !ws.OTPs.VerifyOTP(otp) {
+	otpObj, valid := ws.OTPs.VerifyOTP(otp)
+	if !valid {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -59,7 +67,7 @@ func (ws *Manager) ServeWebsocket(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-	client := NewClient(conn, ws)
+	client := NewClient(conn, ws, otpObj.UserID)
 
 	ws.addClient(client)
 
@@ -85,7 +93,116 @@ func (ws *Manager) setupEventHandlers() {
 }
 
 func SendMessage(event Event, c *Client) error {
-	fmt.Println(event)
+	ctx := context.Background()
+
+	// Unmarshal the event payload
+	var sendMsgEvent SendMessageEvent
+	if err := json.Unmarshal(event.Payload, &sendMsgEvent); err != nil {
+		models.LogErrorWithContext(ctx, "Error unmarshalling send message event", err)
+		return fmt.Errorf("failed to unmarshal send message event: %w", err)
+	}
+
+	// Validate message content
+	if sendMsgEvent.Message == "" {
+		return errors.New("message content cannot be empty")
+	}
+
+	// Parse chatID
+	parsedUUID, err := uuid.Parse(sendMsgEvent.ChatID)
+	if err != nil {
+		models.LogErrorWithContext(ctx, "Invalid chat ID", err)
+		return fmt.Errorf("invalid chat ID: %w", err)
+	}
+	chatID := models.UUIDField{UUID: parsedUUID}
+
+	// Verify sender is in the chat
+	isInChat, err := c.manager.Chats.IsUserInChat(ctx, chatID, c.userID)
+	if err != nil {
+		models.LogErrorWithContext(ctx, "Error checking if user is in chat", err)
+		return fmt.Errorf("failed to verify chat membership: %w", err)
+	}
+	if !isInChat {
+		return errors.New("user is not a member of this chat")
+	}
+
+	// Save message to database
+	messageID, err := c.manager.Chats.CreateChatMessage(ctx, chatID, c.userID, sendMsgEvent.Message)
+	if err != nil {
+		models.LogErrorWithContext(ctx, "Error saving message to database", err)
+		return fmt.Errorf("failed to save message: %w", err)
+	}
+
+	// Get sender information
+	sender, err := c.manager.Users.GetUserByID(ctx, c.userID)
+	if err != nil {
+		models.LogErrorWithContext(ctx, "Error fetching sender info", err)
+		return fmt.Errorf("failed to get sender info: %w", err)
+	}
+
+	// Create NewMessageEvent for broadcasting
+	newMsgEvent := NewMessageEvent{
+		ChatID:    sendMsgEvent.ChatID,
+		MessageID: messageID.String(),
+		Content:   sendMsgEvent.Message,
+		Created:   time.Now(),
+	}
+	newMsgEvent.Sender.ID = sender.ID.String()
+	newMsgEvent.Sender.Username = sender.Username
+	newMsgEvent.Sender.Avatar = sender.Avatar
+
+	// Broadcast to all chat participants
+	if err := c.manager.BroadcastToChatParticipants(ctx, chatID, newMsgEvent); err != nil {
+		models.LogErrorWithContext(ctx, "Error broadcasting message", err)
+		return fmt.Errorf("failed to broadcast message: %w", err)
+	}
+
+	models.LogInfoWithContext(ctx, "Message sent successfully in chat %s by user %s", chatID.String(), sender.Username)
+	return nil
+}
+
+// BroadcastToChatParticipants sends an event to all connected clients who are participants in the chat
+func (ws *Manager) BroadcastToChatParticipants(ctx context.Context, chatID models.UUIDField, newMsgEvent NewMessageEvent) error {
+	// Get all participant IDs for this chat
+	participantIDs, err := ws.Chats.GetChatParticipantIDs(ctx, chatID)
+	if err != nil {
+		return fmt.Errorf("failed to get chat participants: %w", err)
+	}
+
+	// Marshal the event payload
+	payload, err := json.Marshal(newMsgEvent)
+	if err != nil {
+		return fmt.Errorf("failed to marshal new message event: %w", err)
+	}
+
+	// Create the event
+	event := Event{
+		Type:    EventNewMessage,
+		Payload: payload,
+	}
+
+	// Lock to safely iterate over clients
+	ws.RLock()
+	defer ws.RUnlock()
+
+	// Broadcast to all connected clients who are participants
+	broadcastCount := 0
+	for client := range ws.Clients {
+		// Check if this client's userID is in the participant list
+		for _, participantID := range participantIDs {
+			if client.userID == participantID {
+				// Send to this client's egress channel
+				select {
+				case client.egress <- event:
+					broadcastCount++
+				default:
+					models.LogWarnWithContext(ctx, "Client egress channel full, skipping user %s", client.userID.String())
+				}
+				break
+			}
+		}
+	}
+
+	models.LogInfoWithContext(ctx, "Broadcast message to %d/%d participants in chat %s", broadcastCount, len(participantIDs), chatID.String())
 	return nil
 }
 

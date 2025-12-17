@@ -15,24 +15,106 @@ function routeEvent(event) {
     }
 
     switch(event.type) {
-        case "new message":
-            console.log("message received", event.payload)
+        case "new_message":
+            handleNewMessage(event.payload);
             break;
         default:
-            alert("unsupported message type")
+            console.warn("Unsupported message type:", event.type);
     }
+}
+
+function handleNewMessage(payload) {
+    console.log("📨 New message received:", payload);
+
+    // Find the chat container
+    const chatPopover = document.querySelector(`#form-chat-${payload.chat_id}`);
+    if (!chatPopover) {
+        console.log("Chat popover not found or not open, ignoring message");
+        return;
+    }
+
+    const messagesContainer = chatPopover.querySelector('.chat-messages-container');
+    if (!messagesContainer) {
+        console.error("Messages container not found");
+        return;
+    }
+
+    // Get current user data
+    const currentUserData = document.getElementById('current-user-data');
+    if (!currentUserData) {
+        console.error("Current user data not found");
+        return;
+    }
+
+    const currentUserID = currentUserData.dataset.currentUserId;
+
+    // Create message element
+    const messageElement = createMessageElement(payload, currentUserID);
+
+    // Append to container
+    messagesContainer.appendChild(messageElement);
+
+    // Scroll to bottom
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function createMessageElement(message, currentUserID) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chat-message-wrapper cont-flex-row';
+
+    const isSender = message.sender.id === currentUserID;
+    wrapper.classList.add(isSender ? 'flex-end' : 'flex-start');
+
+    // Create avatar
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'chat-avatar';
+    const avatarImg = document.createElement('img');
+    avatarImg.src = message.sender.avatar;
+    avatarImg.alt = message.sender.username;
+    avatarDiv.appendChild(avatarImg);
+
+    // Create message bubble
+    const msgP = document.createElement('p');
+    msgP.className = `chat-msg ${isSender ? 'send' : 'receive'}`;
+    msgP.textContent = message.content;
+
+    // Append in correct order
+    if (isSender) {
+        wrapper.appendChild(msgP);
+        wrapper.appendChild(avatarDiv);
+    } else {
+        wrapper.appendChild(avatarDiv);
+        wrapper.appendChild(msgP);
+    }
+
+    return wrapper;
 }
 
 function sendEvent(eventName, payload) {
     if (!connection || connection.readyState !== WebSocket.OPEN) {
         console.error("WebSocket not connected!");
         alert("WebSocket not connected. Please wait or refresh the page.");
-        return;
+        return false;
     }
 
     const event = new Event(eventName, payload);
     connection.send(JSON.stringify(event));
     console.log("Event sent:", event);
+    return true;
+}
+
+export function sendChatMessage(chatID, message) {
+    if (!connection || connection.readyState !== WebSocket.OPEN) {
+        console.error("WebSocket not connected!");
+        return false;
+    }
+
+    const payload = {
+        chat_id: chatID,
+        message: message
+    };
+
+    return sendEvent("send_message", payload);
 }
 
 export function connectWebSocket(otp) {

@@ -10,12 +10,18 @@
     {{ $header = printf "chat with %s" $chat.Buddy.Username }}
 {{ end }}
 {{ if $dot.CurrentUser }}
-<div popover id="form-chat-{{ $chat.ID }}">
+<div popover id="form-chat-{{ $chat.ID }}" data-chat-id="{{ $chat.ID }}">
     <div class="modal-header">
         <div id="modal-header-chat">{{ $header }}</div>
     </div>
     <div id="chat-popover-title" class="popover-title">
     </div>
+    <!-- Hidden element with current user data for JavaScript -->
+    <div id="current-user-data"
+         data-current-user-id="{{ $dot.CurrentUser.ID }}"
+         data-current-user-avatar="{{ $dot.CurrentUser.Avatar }}"
+         data-current-user-username="{{ $dot.CurrentUser.Username }}"
+         style="display: none;"></div>
     <div class="wrapper-form">
         <div class="chat-messages-container no-scrollbar">
         {{ range $chat.Messages }}

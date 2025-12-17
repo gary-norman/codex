@@ -9,6 +9,7 @@ import {
   pickTheme,
   themeList,
 } from "./consoleThemes.js";
+import "./chat.js";
 
 // Show all themes in console
 showThemesClickable();
