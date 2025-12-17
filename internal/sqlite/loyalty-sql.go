@@ -1,10 +1,10 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/gary-norman/forum/internal/models"
 )
@@ -13,14 +13,14 @@ type LoyaltyModel struct {
 	DB *sql.DB
 }
 
-func (m *LoyaltyModel) InsertLoyalty(follower, following models.UUIDField) error {
-	err := m.InsertFollowing(follower, following)
+func (m *LoyaltyModel) InsertLoyalty(ctx context.Context, follower, following models.UUIDField) error {
+	err := m.InsertFollowing(ctx, follower, following)
 	if err != nil {
 		fmt.Println("Error adding a following")
 		return errors.New(err.Error())
 	}
 
-	err = m.InsertFollower(following, follower)
+	err = m.InsertFollower(ctx, following, follower)
 	if err != nil {
 		fmt.Println("Error adding a follower")
 		return errors.New(err.Error())
@@ -30,9 +30,9 @@ func (m *LoyaltyModel) InsertLoyalty(follower, following models.UUIDField) error
 }
 
 // InsertFollower inserts a
-func (m *LoyaltyModel) InsertFollower(user, follower models.UUIDField) error {
+func (m *LoyaltyModel) InsertFollower(ctx context.Context, user, follower models.UUIDField) error {
 	// Begin the transaction
-	tx, err := m.DB.Begin()
+	tx, err := m.DB.BeginTx(ctx, nil)
 	// fmt.Println("Beginning UPDATE transaction")
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction for Insert Follower: %w", err)
@@ -41,7 +41,7 @@ func (m *LoyaltyModel) InsertFollower(user, follower models.UUIDField) error {
 	// Ensure rollback on failure
 	defer func() {
 		if p := recover(); p != nil {
-			fmt.Println("Rolling back transaction")
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
 			_ = tx.Rollback()
 			panic(p)
 		} else if err != nil {
@@ -49,8 +49,8 @@ func (m *LoyaltyModel) InsertFollower(user, follower models.UUIDField) error {
 		}
 	}()
 
-	stmt := "INSERT INTO Followers (UserID, FollowerUserID) VALUES (?, ?)"
-	_, InsertErr := m.DB.Exec(stmt, user, follower)
+	query := "INSERT INTO Followers (UserID, FollowerUserID) VALUES (?, ?)"
+	_, InsertErr := tx.ExecContext(ctx, query, user, follower)
 	// fmt.Printf("Updating Comments, where reactionID: %v, PostID: %v and UserID: %v with Liked: %v, Disliked: %v\n", reactionID, reactedPostID, authorID, liked, disliked)
 	if InsertErr != nil {
 		return fmt.Errorf("failed to execute Insert query in Insert Follower: %w", err)
@@ -66,41 +66,64 @@ func (m *LoyaltyModel) InsertFollower(user, follower models.UUIDField) error {
 	return commitErr
 }
 
-func (m *LoyaltyModel) CountUsers(userID models.UUIDField) (followers, following int, err error) {
-	stmt1 := `SELECT COUNT(*) AS FollowingCount
+func (m *LoyaltyModel) CountUsers(ctx context.Context, userID models.UUIDField) (followers, following int, err error) {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	// fmt.Println("Beginning DELETE transaction")
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to begin transaction for CountUsers: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	query1 := `SELECT COUNT(*) AS FollowingCount
              FROM Following
              WHERE UserID = ?`
 
-	stmt2 := `SELECT COUNT(*) AS FollowersCount
+	query2 := `SELECT COUNT(*) AS FollowersCount
              FROM Followers
              WHERE UserID = ?`
 
 	var followingCount, followersCount sql.NullInt64
 
 	// Run the query
-	err = m.DB.QueryRow(stmt1, userID).Scan(&followingCount)
+	err = tx.QueryRowContext(ctx, query1, userID).Scan(&followingCount)
 	if err != nil {
 		return 0, 0, err
 	}
 
 	// Run the query
-	err = m.DB.QueryRow(stmt2, userID).Scan(&followersCount)
+	err = tx.QueryRowContext(ctx, query2, userID).Scan(&followersCount)
 	if err != nil {
 		return 0, 0, err
 	}
 
+	// Commit the transaction
+	commitErr := tx.Commit()
+	// fmt.Println("Committing UPDATE transaction")
+	if commitErr != nil {
+		return 0, 0, fmt.Errorf("failed to commit transaction for CountUsers: %w", err)
+	}
+
 	followers = int(followersCount.Int64)
 	following = int(followingCount.Int64)
-	// fmt.Println("likes:", likes)
-	// fmt.Println("dislikes:", dislikes)
 
 	return followers, following, err
 }
 
 // Delete removes an entry in the Following table by ID
-func (m *LoyaltyModel) Delete(followingID, followersID models.UUIDField) error {
+func (m *LoyaltyModel) Delete(ctx context.Context, followingID, followersID models.UUIDField) error {
 	// Begin the transaction
-	tx, err := m.DB.Begin()
+	tx, err := m.DB.BeginTx(ctx, nil)
 	// fmt.Println("Beginning DELETE transaction")
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction for Delete in Following: %w", err)
@@ -109,7 +132,7 @@ func (m *LoyaltyModel) Delete(followingID, followersID models.UUIDField) error {
 	// Ensure rollback on failure
 	defer func() {
 		if p := recover(); p != nil {
-			fmt.Println("Rolling back transaction")
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
 			_ = tx.Rollback()
 			panic(p)
 		} else if err != nil {
@@ -117,17 +140,17 @@ func (m *LoyaltyModel) Delete(followingID, followersID models.UUIDField) error {
 		}
 	}()
 
-	stmt1 := `DELETE FROM Following WHERE ID = ?`
+	query1 := `DELETE FROM Following WHERE ID = ?`
 	// Execute the query, dereferencing the pointers for ID values
-	_, err = m.DB.Exec(stmt1, followingID)
+	_, err = tx.ExecContext(ctx, query1, followingID)
 	// fmt.Printf("Deleting from Reactions where commentID: %v\n", commentID)
 	if err != nil {
 		return fmt.Errorf("failed to execute Delete query: %w", err)
 	}
 
-	stmt2 := `DELETE FROM Followers WHERE ID = ?`
+	query2 := `DELETE FROM Followers WHERE ID = ?`
 	// Execute the query, dereferencing the pointers for ID values
-	_, err = m.DB.Exec(stmt2, followersID)
+	_, err = tx.ExecContext(ctx, query2, followersID)
 	// fmt.Printf("Deleting from Reactions where commentID: %v\n", commentID)
 	if err != nil {
 		return fmt.Errorf("failed to execute Delete query: %w", err)
@@ -144,18 +167,18 @@ func (m *LoyaltyModel) Delete(followingID, followersID models.UUIDField) error {
 }
 
 // InsertFollowing inserts a new user to the Following list of a target use
-func (m *LoyaltyModel) InsertFollowing(user, following models.UUIDField) error {
+func (m *LoyaltyModel) InsertFollowing(ctx context.Context, user, following models.UUIDField) error {
 	// Begin the transaction
 	tx, err := m.DB.Begin()
 	// fmt.Println("Beginning UPDATE transaction")
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction for Insert Following: %w", err)
+		return fmt.Errorf("failed to begin transaction for Insert in Following: %w", err)
 	}
 
 	// Ensure rollback on failure
 	defer func() {
 		if p := recover(); p != nil {
-			fmt.Println("Rolling back transaction")
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
 			_ = tx.Rollback()
 			panic(p)
 		} else if err != nil {
@@ -163,35 +186,45 @@ func (m *LoyaltyModel) InsertFollowing(user, following models.UUIDField) error {
 		}
 	}()
 
-	stmt := "INSERT INTO Following (UserID, FollowingUserID) VALUES (?, ?)"
-	_, InsertErr := m.DB.Exec(stmt, user, following)
-	// fmt.Printf("Updating Comments, where reactionID: %v, PostID: %v and UserID: %v with Liked: %v, Disliked: %v\n", reactionID, reactedPostID, authorID, liked, disliked)
+	query := "INSERT INTO Following (UserID, FollowingUserID) VALUES (?, ?)"
+	_, InsertErr := tx.ExecContext(ctx, query, user, following)
 	if InsertErr != nil {
 		return fmt.Errorf("failed to execute Insert query in Insert Following: %w", err)
 	}
 
 	// Commit the transaction
 	commitErr := tx.Commit()
-	// fmt.Println("Committing UPDATE transaction")
 	if commitErr != nil {
-		return fmt.Errorf("failed to commit transaction for Insert query in Insert Follower: %w", err)
+		return fmt.Errorf("failed to commit transaction in Insert Following: %w", err)
 	}
 
 	return commitErr
 }
 
-func (m *LoyaltyModel) All() ([]models.Loyalty, error) {
-	stmt := "SELECT ID, Follower, Followee FROM Loyalty ORDER BY ID DESC"
-	rows, err := m.DB.Query(stmt)
+func (m *LoyaltyModel) All(ctx context.Context) ([]models.Loyalty, error) {
+	// Begin the transaction
+	tx, err := m.DB.Begin()
+	// fmt.Println("Beginning UPDATE transaction")
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for Loyalty -> All: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	query := "SELECT ID, Follower, Followee FROM Loyalty ORDER BY ID DESC"
+	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
-
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "All", closeErr)
-		}
-	}()
 
 	var Loyalty []models.Loyalty
 	for rows.Next() {
@@ -205,6 +238,12 @@ func (m *LoyaltyModel) All() ([]models.Loyalty, error) {
 
 	if err = rows.Err(); err != nil {
 		return nil, err
+	}
+
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return nil, fmt.Errorf("failed to commit transaction in Loyalty -> All: %w", err)
 	}
 
 	return Loyalty, nil

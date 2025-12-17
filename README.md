@@ -198,6 +198,20 @@ Codex uses a modular CSS architecture for maintainability and performance:
 
 #### Concurrency & Fault Tolerance
 
+**Context Propagation:**
+- Request-scoped context throughout entire database layer
+- All database operations accept `context.Context` as first parameter
+- Automatic query cancellation when clients disconnect
+- Timeout enforcement via context deadlines
+- Foundation for distributed tracing and request correlation
+- Template functions use `context.Background()` for synchronous rendering
+
+**Implementation:**
+- 17 models updated (~100 methods) with context parameters
+- All handlers extract `r.Context()` and pass to model calls
+- Transactions use `BeginTx(ctx, nil)` for context-aware operations
+- Worker pools respect context for graceful shutdown
+
 **Request Tracing:**
 - UUID-based request IDs for distributed tracing
 - Context propagation across middleware and handlers
@@ -229,6 +243,9 @@ Codex uses a modular CSS architecture for maintainability and performance:
 - Automatic timestamp and formatting
 
 **Key Files:**
+- `internal/sqlite/*.go` - Context-aware database models
+- `internal/http/handlers/*.go` - Context extraction and propagation
+- `internal/view/render.go` - Template function wrappers
 - `internal/http/middleware/tracing.go` - Request ID middleware
 - `internal/patterns/circuitbreaker.go` - Circuit breaker implementation
 - `internal/workers/logger_pool.go` - Async logging worker pool
@@ -413,6 +430,7 @@ _For more examples, please refer to the [Documentation](https://example.com)_
 - [x] **Modular CSS architecture**
 - [x] **Database migration system**
 - [x] **Request tracing with context propagation**
+- [x] **Context-aware database layer (17 models, ~100 methods)**
 - [x] **Circuit breaker pattern for fault tolerance**
 - [x] **Async logging with worker pool**
 - [x] **Graceful shutdown with cleanup**

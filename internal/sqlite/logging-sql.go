@@ -1,7 +1,9 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/gary-norman/forum/internal/models"
 )
@@ -12,61 +14,121 @@ type LoggingModel struct {
 }
 
 // InsertRequestLog stores an HTTP request log entry
-func (m *LoggingModel) InsertRequestLog(log models.RequestLog) error {
-	stmt := `INSERT INTO RequestLogs
+func (m *LoggingModel) InsertRequestLog(ctx context.Context, log models.RequestLog) error {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction for InsertRequestLog: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	query := `INSERT INTO RequestLogs
 		(Timestamp, Method, Path, StatusCode, Duration, UserID, IPAddress, UserAgent, Referer, BytesSent)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	userIDBytes, err := log.UserID.Value()
-	if err != nil {
-		return err
-	}
-
-	_, err = m.DB.Exec(stmt,
+	_, err = tx.ExecContext(
+		ctx,
+		query,
 		log.Timestamp,
 		log.Method,
 		log.Path,
 		log.StatusCode,
 		log.Duration,
-		userIDBytes,
+		log.UserID,
 		log.IPAddress,
 		log.UserAgent,
 		log.Referer,
 		log.BytesSent,
 	)
+
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return fmt.Errorf("failed to commit transaction for InsertRequestLog: %w", commitErr)
+	}
 	return err
 }
 
 // InsertErrorLog stores an application error log entry
-func (m *LoggingModel) InsertErrorLog(log models.ErrorLog) error {
-	stmt := `INSERT INTO ErrorLogs
+func (m *LoggingModel) InsertErrorLog(ctx context.Context, log models.ErrorLog) error {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction for InsertErrorLog: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	query := `INSERT INTO ErrorLogs
 		(Timestamp, Level, Message, StackTrace, RequestPath, UserID, Context)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`
 
-	userIDBytes, err := log.UserID.Value()
-	if err != nil {
-		return err
-	}
-
-	_, err = m.DB.Exec(stmt,
+	_, err = tx.ExecContext(
+		ctx,
+		query,
 		log.Timestamp,
 		log.Level,
 		log.Message,
 		log.StackTrace,
 		log.RequestPath,
-		userIDBytes,
+		log.UserID,
 		log.Context,
 	)
+
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return fmt.Errorf("failed to commit transaction for InsertErrorLog: %w", commitErr)
+	}
+
 	return err
 }
 
 // InsertSystemMetric stores a system performance/health metric
-func (m *LoggingModel) InsertSystemMetric(metric models.SystemMetric) error {
-	stmt := `INSERT INTO SystemMetrics
+func (m *LoggingModel) InsertSystemMetric(ctx context.Context, metric models.SystemMetric) error {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction for InsertSystemMetric: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	query := `INSERT INTO SystemMetrics
 		(Timestamp, MetricType, MetricName, MetricValue, Unit, Details)
 		VALUES (?, ?, ?, ?, ?, ?)`
 
-	_, err := m.DB.Exec(stmt,
+	_, err = tx.ExecContext(
+		ctx,
+		query,
 		metric.Timestamp,
 		metric.MetricType,
 		metric.MetricName,
@@ -74,18 +136,42 @@ func (m *LoggingModel) InsertSystemMetric(metric models.SystemMetric) error {
 		metric.Unit,
 		metric.Details,
 	)
+
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return fmt.Errorf("failed to commit transaction for InsertSystemMetric: %w", commitErr)
+	}
+
 	return err
 }
 
 // GetRequestLogsSince retrieves request logs after a given timestamp
-func (m *LoggingModel) GetRequestLogsSince(since string, limit int) ([]models.RequestLog, error) {
-	stmt := `SELECT ID, Timestamp, Method, Path, StatusCode, Duration, UserID, IPAddress, UserAgent, Referer, BytesSent
+func (m *LoggingModel) GetRequestLogsSince(ctx context.Context, since string, limit int) ([]models.RequestLog, error) {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for GetRequestLogsSince: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	query := `SELECT ID, Timestamp, Method, Path, StatusCode, Duration, UserID, IPAddress, UserAgent, Referer, BytesSent
 		FROM RequestLogs
 		WHERE Timestamp >= ?
 		ORDER BY Timestamp DESC
 		LIMIT ?`
 
-	rows, err := m.DB.Query(stmt, since, limit)
+	rows, err := m.DB.Query(query, since, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -113,18 +199,41 @@ func (m *LoggingModel) GetRequestLogsSince(since string, limit int) ([]models.Re
 		logs = append(logs, log)
 	}
 
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return nil, fmt.Errorf("failed to commit transaction for InsertSystemMetric: %w", commitErr)
+	}
+
 	return logs, rows.Err()
 }
 
 // GetErrorLogsSince retrieves error logs after a given timestamp
-func (m *LoggingModel) GetErrorLogsSince(since string, limit int) ([]models.ErrorLog, error) {
-	stmt := `SELECT ID, Timestamp, Level, Message, StackTrace, RequestPath, UserID, Context
+func (m *LoggingModel) GetErrorLogsSince(ctx context.Context, since string, limit int) ([]models.ErrorLog, error) {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for GetErrorLogsSince: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	query := `SELECT ID, Timestamp, Level, Message, StackTrace, RequestPath, UserID, Context
 		FROM ErrorLogs
 		WHERE Timestamp >= ?
 		ORDER BY Timestamp DESC
 		LIMIT ?`
 
-	rows, err := m.DB.Query(stmt, since, limit)
+	rows, err := m.DB.Query(query, since, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -149,18 +258,41 @@ func (m *LoggingModel) GetErrorLogsSince(since string, limit int) ([]models.Erro
 		logs = append(logs, log)
 	}
 
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return nil, fmt.Errorf("failed to commit transaction for GetErrorLogsSince: %w", commitErr)
+	}
+
 	return logs, rows.Err()
 }
 
 // GetSystemMetricsSince retrieves system metrics after a given timestamp
-func (m *LoggingModel) GetSystemMetricsSince(since string, limit int) ([]models.SystemMetric, error) {
-	stmt := `SELECT ID, Timestamp, MetricType, MetricName, MetricValue, Unit, Details
+func (m *LoggingModel) GetSystemMetricsSince(ctx context.Context, since string, limit int) ([]models.SystemMetric, error) {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for GetSystemMetricsSince: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	query := `SELECT ID, Timestamp, MetricType, MetricName, MetricValue, Unit, Details
 		FROM SystemMetrics
 		WHERE Timestamp >= ?
 		ORDER BY Timestamp DESC
 		LIMIT ?`
 
-	rows, err := m.DB.Query(stmt, since, limit)
+	rows, err := m.DB.Query(query, since, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +316,12 @@ func (m *LoggingModel) GetSystemMetricsSince(since string, limit int) ([]models.
 		metrics = append(metrics, metric)
 	}
 
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return nil, fmt.Errorf("failed to commit transaction for GetSystemMetricsSince: %w", commitErr)
+	}
+
 	return metrics, rows.Err()
 }
 
@@ -196,13 +334,30 @@ type RequestStats struct {
 	RequestsPerPath map[string]int64
 }
 
-func (m *LoggingModel) GetRequestStats(since string) (*RequestStats, error) {
+func (m *LoggingModel) GetRequestStats(ctx context.Context, since string) (*RequestStats, error) {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for GetRequestStats: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	stats := &RequestStats{
 		RequestsPerPath: make(map[string]int64),
 	}
 
 	// Total requests and average duration
-	err := m.DB.QueryRow(`
+	err = m.DB.QueryRow(`
 		SELECT COUNT(*), AVG(Duration)
 		FROM RequestLogs
 		WHERE Timestamp >= ?`, since).Scan(&stats.TotalRequests, &stats.AvgDuration)
@@ -254,26 +409,55 @@ func (m *LoggingModel) GetRequestStats(since string) (*RequestStats, error) {
 		stats.RequestsPerPath[path] = count
 	}
 
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return nil, fmt.Errorf("failed to commit transaction for GetRequestStats: %w", commitErr)
+	}
+
 	return stats, rows.Err()
 }
 
 // CleanupOldLogs deletes logs older than the specified number of days
-func (m *LoggingModel) CleanupOldLogs(daysToKeep int) error {
+func (m *LoggingModel) CleanupOldLogs(ctx context.Context, daysToKeep int) error {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction for CleanupOldLogs: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	cutoff := `datetime('now', '-` + string(rune(daysToKeep+'0')) + ` days')`
 
 	// Clean request logs
-	if _, err := m.DB.Exec(`DELETE FROM RequestLogs WHERE Timestamp < ` + cutoff); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM RequestLogs WHERE Timestamp < `+cutoff); err != nil {
 		return err
 	}
 
 	// Clean error logs
-	if _, err := m.DB.Exec(`DELETE FROM ErrorLogs WHERE Timestamp < ` + cutoff); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM ErrorLogs WHERE Timestamp < `+cutoff); err != nil {
 		return err
 	}
 
 	// Clean system metrics
-	if _, err := m.DB.Exec(`DELETE FROM SystemMetrics WHERE Timestamp < ` + cutoff); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM SystemMetrics WHERE Timestamp < `+cutoff); err != nil {
 		return err
+	}
+
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return fmt.Errorf("failed to commit transaction for CleanupOldLogs: %w", commitErr)
 	}
 
 	return nil

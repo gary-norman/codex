@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -12,9 +13,10 @@ type PostModel struct {
 	DB *sql.DB
 }
 
-func (m *PostModel) Insert(title, content, images, author, authorAvatar string, authorID models.UUIDField, commentable, isFlagged bool) (int64, error) {
+// Insert a new post into the database
+func (m *PostModel) Insert(ctx context.Context, title, content, images, author, authorAvatar string, authorID models.UUIDField, commentable, isFlagged bool) (int64, error) {
 	stmt := "INSERT INTO Posts (Title, Content, Images, Created, Author, AuthorAvatar, AuthorID, IsCommentable, IsFlagged) VALUES (?, ?, ?, DateTime('now'), ?, ?, ?, ?, ?)"
-	result, err := m.DB.Exec(stmt, title, content, images, author, authorAvatar, authorID, commentable, isFlagged)
+	result, err := m.DB.ExecContext(ctx, stmt, title, content, images, author, authorAvatar, authorID, commentable, isFlagged)
 	if err != nil {
 		return 0, err
 	}
@@ -28,9 +30,9 @@ func (m *PostModel) Insert(title, content, images, author, authorAvatar string, 
 	return int64(id), nil
 }
 
-func (m *PostModel) All() ([]*models.Post, error) {
+func (m *PostModel) All(ctx context.Context) ([]*models.Post, error) {
 	stmt := "SELECT * FROM Posts ORDER BY Created DESC"
-	rows, selectErr := m.DB.Query(stmt)
+	rows, selectErr := m.DB.QueryContext(ctx, stmt)
 	if selectErr != nil {
 		return nil, fmt.Errorf("failed to query all posts: %w", selectErr)
 	}
@@ -69,9 +71,9 @@ func (m *PostModel) All() ([]*models.Post, error) {
 	return Posts, nil
 }
 
-func (m *PostModel) GetPostsByUserID(user models.UUIDField) ([]*models.Post, error) {
+func (m *PostModel) GetPostsByUserID(ctx context.Context, user models.UUIDField) ([]*models.Post, error) {
 	stmt := "SELECT * FROM posts WHERE AuthorID = ? ORDER BY ID DESC"
-	rows, err := m.DB.Query(stmt, user)
+	rows, err := m.DB.QueryContext(ctx, stmt, user)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query posts by user ID: %w", err)
 	}
@@ -104,9 +106,9 @@ func (m *PostModel) GetPostsByUserID(user models.UUIDField) ([]*models.Post, err
 	return Posts, nil
 }
 
-func (m *PostModel) GetPostsByChannel(channel int64) ([]*models.Post, error) {
+func (m *PostModel) GetPostsByChannel(ctx context.Context, channel int64) ([]*models.Post, error) {
 	stmt := "SELECT * FROM Posts WHERE ID IN (SELECT PostID FROM PostChannels WHERE ChannelID = ?) ORDER BY Created DESC"
-	rows, err := m.DB.Query(stmt, channel)
+	rows, err := m.DB.QueryContext(ctx, stmt, channel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query posts by channel: %w", err)
 	}
@@ -140,9 +142,9 @@ func (m *PostModel) GetPostsByChannel(channel int64) ([]*models.Post, error) {
 	return Posts, nil
 }
 
-func (m *PostModel) GetPostByID(id int64) (models.Post, error) {
+func (m *PostModel) GetPostByID(ctx context.Context, id int64) (models.Post, error) {
 	stmt := "SELECT * FROM Posts WHERE ID = ?"
-	row := m.DB.QueryRow(stmt, id)
+	row := m.DB.QueryRowContext(ctx, stmt, id)
 	p := models.Post{}
 	err := row.Scan(
 		&p.ID,
@@ -163,9 +165,9 @@ func (m *PostModel) GetPostByID(id int64) (models.Post, error) {
 	return p, nil
 }
 
-func (m *PostModel) GetAllChannelPostsForUser(ID models.UUIDField) ([]models.Post, error) {
+func (m *PostModel) GetAllChannelPostsForUser(ctx context.Context, ID models.UUIDField) ([]models.Post, error) {
 	stmt := "SELECT * From posts WHERE ID IN (SELECT ChannelID FROM Memberships WHERE UserID = ?)"
-	rows, err := m.DB.Query(stmt, ID)
+	rows, err := m.DB.QueryContext(ctx, stmt, ID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +191,7 @@ func (m *PostModel) GetAllChannelPostsForUser(ID models.UUIDField) ([]models.Pos
 }
 
 // FindCurrentPost queries the database for any post column that contains the values and returns that post
-func (m *PostModel) FindCurrentPost(column string, value any) ([]models.Post, error) {
+func (m *PostModel) FindCurrentPost(ctx context.Context, column string, value any) ([]models.Post, error) {
 	// Validate column name to prevent SQL injection
 	validColumns := map[string]bool{
 		"id":            true,
@@ -212,7 +214,7 @@ func (m *PostModel) FindCurrentPost(column string, value any) ([]models.Post, er
 	// Base query
 	query := fmt.Sprintf("SELECT id, title, content, images, created, isCommentable, author, authorID, authorAvatar,  isFlagged FROM posts WHERE %s = ? LIMIT 1", column)
 
-	row := m.DB.QueryRow(query, value)
+	row := m.DB.QueryRowContext(ctx, query, value)
 
 	// Parse result into a single post
 	var posts []models.Post

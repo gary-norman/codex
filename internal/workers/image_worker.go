@@ -116,6 +116,7 @@ func (pool *ImageWorkerPool) Shutdown(ctx context.Context) error {
 // processJob handles a single image processing job
 // This is called by worker goroutines
 func (pool *ImageWorkerPool) processJob(job ImageJob, workerID int) {
+	ctx := context.Background() // Use background context for DB operations
 	log.Printf(workerColors.Teal+"[Worker %d] Processing job %s: %s"+workerColors.Reset+"\n",
 		workerID, job.ID, job.FilePath)
 
@@ -155,7 +156,7 @@ func (pool *ImageWorkerPool) processJob(job ImageJob, workerID int) {
 		return // No database in test environment
 	}
 
-	imageID, err := pool.imageModel.Insert(job.UserID, job.PostID, processedPath)
+	imageID, err := pool.imageModel.Insert(ctx, job.UserID, job.PostID, processedPath)
 	if err != nil {
 		log.Printf(workerColors.Red+"[Worker %d] Failed to save image metadata: %v"+workerColors.Reset+"\n",
 			workerID, err)

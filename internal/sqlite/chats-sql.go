@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -11,10 +12,10 @@ type ChatModel struct {
 	DB *sql.DB
 }
 
-func (c *ChatModel) CreateChat(chatType, name string, groupID, buddyID models.UUIDField) (models.UUIDField, error) {
+func (c *ChatModel) CreateChat(ctx context.Context, chatType, name string, groupID, buddyID models.UUIDField) (models.UUIDField, error) {
 	chatID := models.NewUUIDField()
 	query := "INSERT INTO Chats (ID, Type, Name, GroupID, BuddyID, Created) VALUES (?, ?, ?, ?, ?, DateTime('now'))"
-	_, err := c.DB.Exec(query, chatID, chatType, name, groupID, buddyID)
+	_, err := c.DB.ExecContext(ctx, query, chatID, chatType, name, groupID, buddyID)
 	if err != nil {
 		return models.UUIDField{}, fmt.Errorf("failed to insert chat: %w", err)
 	}
@@ -22,10 +23,10 @@ func (c *ChatModel) CreateChat(chatType, name string, groupID, buddyID models.UU
 	return chatID, nil
 }
 
-func (c *ChatModel) CreateChatMessage(chatID, userID models.UUIDField, message string) (models.UUIDField, error) {
+func (c *ChatModel) CreateChatMessage(ctx context.Context, chatID, userID models.UUIDField, message string) (models.UUIDField, error) {
 	messageID := models.NewUUIDField()
 	query := "INSERT INTO Messages (ID, ChatID, UserID, Created, Content) VALUES (?, ?, ?, DateTime('now'), ?)"
-	_, err := c.DB.Exec(query, messageID, chatID, userID, message)
+	_, err := c.DB.ExecContext(ctx, query, messageID, chatID, userID, message)
 	if err != nil {
 		return models.UUIDField{}, fmt.Errorf("failed to insert message: %w", err)
 	}
@@ -33,9 +34,9 @@ func (c *ChatModel) CreateChatMessage(chatID, userID models.UUIDField, message s
 	return messageID, nil
 }
 
-func (c *ChatModel) AttachUserToChat(chatID, userID models.UUIDField) error {
+func (c *ChatModel) AttachUserToChat(ctx context.Context, chatID, userID models.UUIDField) error {
 	query := "INSERT INTO ChatUsers (ChatID, UserID) VALUES (?, ?)"
-	_, err := c.DB.Exec(query, chatID, userID)
+	_, err := c.DB.ExecContext(ctx, query, chatID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to attach user to chat: %w", err)
 	}
@@ -43,9 +44,9 @@ func (c *ChatModel) AttachUserToChat(chatID, userID models.UUIDField) error {
 	return nil
 }
 
-func (c *ChatModel) GetUserChatIDs(userID models.UUIDField) ([]models.UUIDField, error) {
+func (c *ChatModel) GetUserChatIDs(ctx context.Context, userID models.UUIDField) ([]models.UUIDField, error) {
 	query := `SELECT ChatID FROM ChatUsers WHERE UserID = ?`
-	rows, err := c.DB.Query(query, userID)
+	rows, err := c.DB.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user chat IDs: %w", err)
 	}
@@ -64,14 +65,32 @@ func (c *ChatModel) GetUserChatIDs(userID models.UUIDField) ([]models.UUIDField,
 }
 
 // GetChat retrieves a single chat by its ID
-func (c *ChatModel) GetChat(chatID models.UUIDField) (*models.Chat, error) {
+func (c *ChatModel) GetChat(ctx context.Context, chatID models.UUIDField) (*models.Chat, error) {
+	// Begin the transaction
+	tx, err := c.DB.BeginTx(ctx, nil)
+	// fmt.Println("Beginning UPDATE transaction")
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for GetChat: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	query := "SELECT ID, Type, Name, Created, LastActive, GroupID, BuddyID FROM Chats WHERE ID = ?"
-	row := c.DB.QueryRow(query, chatID)
+	row := tx.QueryRowContext(ctx, query, chatID)
 
 	var chat models.Chat
 	var buddyID, groupID models.NullableUUIDField
 
-	err := row.Scan(&chat.ID, &chat.ChatType, &chat.Name, &chat.Created, &chat.LastActive, &groupID, &buddyID)
+	err = row.Scan(&chat.ID, &chat.ChatType, &chat.Name, &chat.Created, &chat.LastActive, &groupID, &buddyID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("chat not found: %s", chatID)
@@ -86,11 +105,35 @@ func (c *ChatModel) GetChat(chatID models.UUIDField) (*models.Chat, error) {
 		chat.Buddy = &models.User{ID: buddyID.UUID}
 	}
 
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return nil, fmt.Errorf("failed to commit transaction for GetChat: %w", commitErr)
+	}
+
 	return &chat, nil
 }
 
 // GetUserChats retrieves all chats for a specific user
-func (c *ChatModel) GetUserChats(userID models.UUIDField) ([]models.Chat, error) {
+func (c *ChatModel) GetUserChats(ctx context.Context, userID models.UUIDField) ([]models.Chat, error) {
+	// Begin the transaction
+	tx, err := c.DB.BeginTx(ctx, nil)
+	// fmt.Println("Beginning UPDATE transaction")
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for GetUserChats: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	query := `
 		SELECT c.ID, c.Type, c.Name, c.Created, c.LastActive, c.GroupID, c.BuddyID
 		FROM Chats c
@@ -99,7 +142,7 @@ func (c *ChatModel) GetUserChats(userID models.UUIDField) ([]models.Chat, error)
 		ORDER BY c.LastActive DESC
 	`
 
-	rows, err := c.DB.Query(query, userID)
+	rows, err := tx.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user chats: %w", err)
 	}
@@ -125,11 +168,35 @@ func (c *ChatModel) GetUserChats(userID models.UUIDField) ([]models.Chat, error)
 		chats = append(chats, chat)
 	}
 
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return nil, fmt.Errorf("failed to commit transaction for GetUserChats: %w", commitErr)
+	}
+
 	return chats, nil
 }
 
 // GetChatMessages retrieves all messages for a specific chat
-func (c *ChatModel) GetChatMessages(chatID models.UUIDField) ([]models.ChatMessage, error) {
+func (c *ChatModel) GetChatMessages(ctx context.Context, chatID models.UUIDField) ([]models.ChatMessage, error) {
+	// Begin the transaction
+	tx, err := c.DB.BeginTx(ctx, nil)
+	// fmt.Println("Beginning UPDATE transaction")
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for GetChatMessages: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	query := `
 		SELECT
 			m.ID, m.ChatID, m.Created, m.Content,
@@ -142,7 +209,7 @@ func (c *ChatModel) GetChatMessages(chatID models.UUIDField) ([]models.ChatMessa
 		ORDER BY m.Created ASC
 	`
 
-	rows, err := c.DB.Query(query, chatID)
+	rows, err := tx.QueryContext(ctx, query, chatID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query chat messages: %w", err)
 	}
@@ -208,6 +275,12 @@ func (c *ChatModel) GetChatMessages(chatID models.UUIDField) ([]models.ChatMessa
 		}
 
 		messages = append(messages, message)
+	}
+
+	// Commit the transaction
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		return nil, fmt.Errorf("failed to commit transaction for GetChatMessages: %w", commitErr)
 	}
 
 	return messages, nil

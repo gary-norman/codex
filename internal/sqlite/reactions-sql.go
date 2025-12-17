@@ -2,10 +2,10 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/gary-norman/forum/internal/models"
 )
@@ -19,7 +19,7 @@ type ReactionStatus struct {
 	Disliked bool
 }
 
-func (m *ReactionModel) GetLastReaction(reactedPostID, reactedCommentID int64) (models.Reaction, error) {
+func (m *ReactionModel) GetLastReaction(ctx context.Context, reactedPostID, reactedCommentID int64) (models.Reaction, error) {
 	whereArgs, arg := preparePostChannelDynamicWhere(reactedPostID, reactedCommentID)
 
 	stmt := fmt.Sprintf(`
@@ -36,7 +36,7 @@ func (m *ReactionModel) GetLastReaction(reactedPostID, reactedCommentID int64) (
 	ORDER BY id DESC
 	LIMIT 1`, whereArgs)
 
-	row := m.DB.QueryRow(stmt, arg)
+	row := m.DB.QueryRowContext(ctx, stmt, arg)
 
 	var reaction models.Reaction
 
@@ -62,7 +62,7 @@ func (m *ReactionModel) GetLastReaction(reactedPostID, reactedCommentID int64) (
 	return reaction, nil
 }
 
-func (m *ReactionModel) GetReactionStatus(authorID models.UUIDField, reactedPostID, reactedCommentID int64) (ReactionStatus, error) {
+func (m *ReactionModel) GetReactionStatus(ctx context.Context, authorID models.UUIDField, reactedPostID, reactedCommentID int64) (ReactionStatus, error) {
 	var liked, disliked int
 	var reactions ReactionStatus
 	if m == nil || m.DB == nil {
@@ -79,7 +79,7 @@ func (m *ReactionModel) GetReactionStatus(authorID models.UUIDField, reactedPost
 	WHERE AuthorID = ? AND %s
 	`, whereArgs)
 
-	if err := m.DB.QueryRow(stmt, authorID, arg).Scan(&liked, &disliked); err != nil {
+	if err := m.DB.QueryRowContext(ctx, stmt, authorID, arg).Scan(&liked, &disliked); err != nil {
 		return reactions, err
 	}
 
@@ -89,7 +89,7 @@ func (m *ReactionModel) GetReactionStatus(authorID models.UUIDField, reactedPost
 	return reactions, nil
 }
 
-func (m *ReactionModel) Upsert(liked, disliked bool, authorID models.UUIDField, reactedPostID, reactedCommentID int64) error {
+func (m *ReactionModel) Upsert(ctx context.Context, liked, disliked bool, authorID models.UUIDField, reactedPostID, reactedCommentID int64) error {
 	if !isValidParent(reactedPostID, reactedCommentID) {
 		return fmt.Errorf("only one of ReactedPostID or ReactedCommentID must be non-zero")
 	}
@@ -142,7 +142,7 @@ func (m *ReactionModel) Upsert(liked, disliked bool, authorID models.UUIDField, 
 		args = []any{authorID, reactedCommentID, liked, disliked, authorID, reactedCommentID}
 	}
 
-	_, err := m.DB.Exec(query, args...)
+	_, err := m.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to upsert reaction: %w", err)
 	}
@@ -150,7 +150,7 @@ func (m *ReactionModel) Upsert(liked, disliked bool, authorID models.UUIDField, 
 	return nil
 }
 
-func (m *ReactionModel) CountReactions(reactedPostID, reactedCommentID int64) (likes, dislikes int, err error) {
+func (m *ReactionModel) CountReactions(ctx context.Context, reactedPostID, reactedCommentID int64) (likes, dislikes int, err error) {
 	if !isValidParent(reactedPostID, reactedCommentID) {
 		return 0, 0, fmt.Errorf("only one of  ReactedPostID, or ReactedCommentID must be non-zero")
 	}
@@ -166,7 +166,7 @@ func (m *ReactionModel) CountReactions(reactedPostID, reactedCommentID int64) (l
 	var likesSum, dislikesSum sql.NullInt64
 
 	// Run the query
-	err = m.DB.QueryRow(stmt, arg).Scan(&likesSum, &dislikesSum)
+	err = m.DB.QueryRowContext(ctx, stmt, arg).Scan(&likesSum, &dislikesSum)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -177,10 +177,10 @@ func (m *ReactionModel) CountReactions(reactedPostID, reactedCommentID int64) (l
 }
 
 // Delete removes a reaction from the database by ID
-func (m *ReactionModel) Delete(reactionID int64) error {
+func (m *ReactionModel) Delete(ctx context.Context, reactionID int64) error {
 	stmt := `DELETE FROM Reactions WHERE ID = ?`
 	// Execute the query, dereferencing the pointers for ID values
-	_, err := m.DB.Exec(stmt, reactionID)
+	_, err := m.DB.ExecContext(ctx, stmt, reactionID)
 	// fmt.Printf("Deleting from Reactions where reactionID: %v\n", reactionID)
 	if err != nil {
 		return fmt.Errorf("failed to execute Delete query: %w", err)
@@ -189,16 +189,16 @@ func (m *ReactionModel) Delete(reactionID int64) error {
 	return err
 }
 
-func (m *ReactionModel) All() ([]models.Reaction, error) {
+func (m *ReactionModel) All(ctx context.Context) ([]models.Reaction, error) {
 	stmt := "SELECT ID, Liked, Disliked, AuthorID, Created, ReactedPostID, ReactedCommentID FROM Reactions ORDER BY ID DESC"
-	rows, err := m.DB.Query(stmt)
+	rows, err := m.DB.QueryContext(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
 
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "All", closeErr)
+			models.LogErrorWithContext(ctx, "Failed to close rows in Reaction All: %v", closeErr)
 		}
 	}()
 

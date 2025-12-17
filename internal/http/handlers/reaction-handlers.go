@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,8 +16,9 @@ type ReactionHandler struct {
 
 // GetPostsLikesAndDislikes updates the reactions of each post in the given slice
 func (h *ReactionHandler) GetPostsLikesAndDislikes(posts []*models.Post) []*models.Post {
+	ctx := context.Background()
 	for p, post := range posts {
-		likes, dislikes, err := h.App.Reactions.CountReactions(post.ID, 0) // Pass 0 for CommentID if it's a post
+		likes, dislikes, err := h.App.Reactions.CountReactions(ctx, post.ID, 0) // Pass 0 for CommentID if it's a post
 		// fmt.Printf("PostID: %v, Likes: %v, Dislikes: %v\n", posts[i].ID, likes, dislikes)
 		if err != nil {
 			models.LogError("Failed to count reactions for post", err, "PostID:", post.ID)
@@ -28,6 +30,7 @@ func (h *ReactionHandler) GetPostsLikesAndDislikes(posts []*models.Post) []*mode
 }
 
 func (h *ReactionHandler) getLastReactionTimeForPosts(posts []*models.Post) ([]*models.Post, error) {
+	ctx := context.Background()
 	for i := range posts {
 		p := posts[i]
 
@@ -35,7 +38,7 @@ func (h *ReactionHandler) getLastReactionTimeForPosts(posts []*models.Post) ([]*
 			continue
 		}
 
-		lastReactionTime, err := h.App.Reactions.GetLastReaction(p.ID, 0)
+		lastReactionTime, err := h.App.Reactions.GetLastReaction(ctx, p.ID, 0)
 		if err != nil {
 			models.LogError("Failed to get last reaction time for post", err, "PostID:", p.ID)
 		}
@@ -53,8 +56,9 @@ func (h *ReactionHandler) getLastReactionTimeForPosts(posts []*models.Post) ([]*
 
 // GetCommentsLikesAndDislikes updates the reactions of each comment in the given slice
 func (h *ReactionHandler) GetCommentsLikesAndDislikes(comments []models.Comment) []models.Comment {
+	ctx := context.Background()
 	for c, comment := range comments {
-		likes, dislikes, err := h.App.Reactions.CountReactions(0, comment.ID) // Pass 0 for PostID if it's a comment
+		likes, dislikes, err := h.App.Reactions.CountReactions(ctx, 0, comment.ID) // Pass 0 for PostID if it's a comment
 		// fmt.Printf("PostID: %v, Likes: %v, Dislikes: %v\n", posts[i].ID, likes, dislikes)
 		if err != nil {
 			models.LogError("Failed to count reactions for comment", err, "CommentID:", comment.ID)
@@ -66,6 +70,7 @@ func (h *ReactionHandler) GetCommentsLikesAndDislikes(comments []models.Comment)
 }
 
 func (h *ReactionHandler) StoreReaction(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	models.LogInfoWithContext(r.Context(), "Processing reaction storage request")
 
 	// Variable to hold the decoded data
@@ -115,7 +120,7 @@ func (h *ReactionHandler) StoreReaction(w http.ResponseWriter, r *http.Request) 
 
 	models.LogInfoWithContext(r.Context(), "Updating reaction for %s", fmt.Sprintf("%s: %d", updatedStr, updatedID))
 
-	if err := h.App.Reactions.Upsert(reactionData.Liked, reactionData.Disliked, reactionData.AuthorID, reactionData.PostID, reactionData.CommentID); err != nil {
+	if err := h.App.Reactions.Upsert(ctx, reactionData.Liked, reactionData.Disliked, reactionData.AuthorID, reactionData.PostID, reactionData.CommentID); err != nil {
 		models.LogErrorWithContext(r.Context(), "Failed to upsert reaction", err, fmt.Sprintf("%s: %d", updatedStr, updatedID))
 		w.WriteHeader(http.StatusInternalServerError)
 		return

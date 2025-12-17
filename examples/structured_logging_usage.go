@@ -1,6 +1,7 @@
 package examples
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gary-norman/forum/internal/models"
@@ -17,6 +18,7 @@ func ExamplePostCreation(w http.ResponseWriter, r *http.Request, loggerPool *wor
 
 	// Simulated post creation
 	var newPost models.Post
+	fmt.Printf("Creating post by user %s: %s", user.Username, newPost.Title)
 	// newPost = ... create post in database ...
 	postID := int64(123)
 	channelID := int64(5)

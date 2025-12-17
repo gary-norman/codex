@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -13,9 +14,9 @@ type CommentModel struct {
 }
 
 // Upsert inserts or updates a reaction for a specific combination of AuthorID and the parent fields (ChannelID, ReactedPostID, ReactedCommentID). It uses Exists to determine if the reaction already exists.
-func (m *CommentModel) Upsert(comment models.Comment) error {
+func (m *CommentModel) Upsert(ctx context.Context, comment models.Comment) error {
 	// Check if the reaction exists
-	exists, err := m.Exists(comment)
+	exists, err := m.Exists(ctx, comment)
 	if err != nil {
 		return fmt.Errorf("failed to check existence of comment: %w", err)
 	}
@@ -23,16 +24,16 @@ func (m *CommentModel) Upsert(comment models.Comment) error {
 	if exists {
 		// If the reaction exists, update it
 		// fmt.Println("Updating a reaction which already exists (reactions.go :53)")
-		return m.Update(comment)
+		return m.Update(ctx, comment)
 	}
 	// fmt.Println("Inserting a reaction (reactions.go :56)")
 
-	return m.Insert(comment)
+	return m.Insert(ctx, comment)
 }
 
-func (m *CommentModel) Insert(comment models.Comment) error {
+func (m *CommentModel) Insert(ctx context.Context, comment models.Comment) error {
 	// Begin the transaction
-	tx, err := m.DB.Begin()
+	tx, err := m.DB.BeginTx(ctx, nil)
 	// fmt.Println("Beginning INSERT INTO transaction")
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction for Insert in Comments: %w", err)
@@ -50,13 +51,13 @@ func (m *CommentModel) Insert(comment models.Comment) error {
 	}()
 
 	// Define the SQL statement
-	query := `INSERT INTO Comments 
-		(Content, Created, Author, AuthorID, AuthorAvatar, ChannelName, ChannelID, CommentedPostID, 
+	query := `INSERT INTO Comments
+		(Content, Created, Author, AuthorID, AuthorAvatar, ChannelName, ChannelID, CommentedPostID,
 		CommentedCommentID, IsCommentable, IsFlagged, IsReply)
 		VALUES (?, DateTime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	// Execute the query, dereferencing the pointers is handled by database/sql
-	_, err = tx.Exec(query,
+	_, err = tx.ExecContext(ctx, query,
 		comment.Content,
 		comment.Author,
 		comment.AuthorID,
@@ -84,13 +85,13 @@ func (m *CommentModel) Insert(comment models.Comment) error {
 	return nil
 }
 
-func (m *CommentModel) Update(comment models.Comment) error {
+func (m *CommentModel) Update(ctx context.Context, comment models.Comment) error {
 	//if !isValidParent(*comment.CommentedPostID, *comment.CommentedCommentID) {
 	//	return fmt.Errorf("only one of CommentedPostID, or CommentedCommentID must be non-zero")
 	//}
 
 	// Begin the transaction
-	tx, err := m.DB.Begin()
+	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction for Insert in Comments: %w", err)
 	}
@@ -108,12 +109,12 @@ func (m *CommentModel) Update(comment models.Comment) error {
 
 	// TODO add Updated field, which should be populated on update
 	// Define the SQL statement
-	query := `UPDATE Comments 
+	query := `UPDATE Comments
 		SET Content = ?, IsCommentable = ?, IsFlagged = ?, Author = ?, AuthorAvatar = ?, ChannelName = ?, ChannelID = ?
 		WHERE AuthorID = ? AND (CommentedPostID = ? OR CommentedCommentID = ?)`
 
 	// Execute the query
-	_, err = tx.Exec(query,
+	_, err = tx.ExecContext(ctx, query,
 		comment.Content,
 		comment.Author,
 		comment.AuthorID,
@@ -140,17 +141,17 @@ func (m *CommentModel) Update(comment models.Comment) error {
 }
 
 // Exists helps avoid creating duplicate comments by determining whether a comment for the specific combination of AuthorID, PostID/CommentID and Content
-func (m *CommentModel) Exists(comment models.Comment) (bool, error) {
+func (m *CommentModel) Exists(ctx context.Context, comment models.Comment) (bool, error) {
 	// SQL query to check if the comment exists with the provided parameters
 	stmt := `SELECT EXISTS(
                 SELECT 1 FROM Comments
-                WHERE AuthorID = ? AND 
-                      CommentedPostID = ? AND 
-                      CommentedCommentID = ? AND 
+                WHERE AuthorID = ? AND
+                      CommentedPostID = ? AND
+                      CommentedCommentID = ? AND
                       Content = ?)`
 
 	var exists bool
-	err := m.DB.QueryRow(stmt,
+	err := m.DB.QueryRowContext(ctx, stmt,
 		&comment.AuthorID,
 		&comment.CommentedPostID,
 		&comment.CommentedCommentID,
@@ -160,9 +161,9 @@ func (m *CommentModel) Exists(comment models.Comment) (bool, error) {
 }
 
 // Delete removes a comment from the database by ID
-func (m *CommentModel) Delete(commentID int64) error {
+func (m *CommentModel) Delete(ctx context.Context, commentID int64) error {
 	// Begin the transaction
-	tx, err := m.DB.Begin()
+	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction for Delete in Comments: %w", err)
 	}
@@ -180,7 +181,7 @@ func (m *CommentModel) Delete(commentID int64) error {
 
 	query := `DELETE FROM Comments WHERE ID = ?`
 	// Execute the query, dereferencing the pointers for ID values
-	_, err = m.DB.Exec(query, commentID)
+	_, err = m.DB.ExecContext(ctx, query, commentID)
 	// fmt.Printf("Deleting from Reactions where commentID: %v\n", commentID)
 	if err != nil {
 		return fmt.Errorf("failed to execute Delete query: %w", err)
@@ -195,9 +196,9 @@ func (m *CommentModel) Delete(commentID int64) error {
 	return nil
 }
 
-func (m *CommentModel) GetCommentByPostID(id int64) ([]models.Comment, error) {
+func (m *CommentModel) GetCommentByPostID(ctx context.Context, id int64) ([]models.Comment, error) {
 	// Begin the transaction
-	tx, err := m.DB.Begin()
+	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction for GetCommentByPostID in Comments: %w", err)
 	}
@@ -206,7 +207,7 @@ func (m *CommentModel) GetCommentByPostID(id int64) ([]models.Comment, error) {
 		return nil, fmt.Errorf("database connection is not initialized")
 	}
 	stmt := "SELECT * FROM Comments WHERE CommentedPostID = ? ORDER BY ID DESC"
-	rows, err := m.DB.Query(stmt, id)
+	rows, err := m.DB.QueryContext(ctx, stmt, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query comments by post ID %d: %w", id, err)
 	}
@@ -255,9 +256,9 @@ func (m *CommentModel) GetCommentByPostID(id int64) ([]models.Comment, error) {
 	return comments, nil
 }
 
-func (m *CommentModel) GetCommentByCommentID(id int64) ([]models.Comment, error) {
+func (m *CommentModel) GetCommentByCommentID(ctx context.Context, id int64) ([]models.Comment, error) {
 	// Begin the transaction
-	tx, err := m.DB.Begin()
+	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction for GetCommentByCommentID in Comments: %w", err)
 	}
@@ -266,7 +267,7 @@ func (m *CommentModel) GetCommentByCommentID(id int64) ([]models.Comment, error)
 		return nil, fmt.Errorf("database connection is not initialized")
 	}
 	stmt := "SELECT * FROM Comments WHERE CommentedCommentID = ? ORDER BY ID DESC"
-	rows, err := m.DB.Query(stmt, id)
+	rows, err := m.DB.QueryContext(ctx, stmt, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query comments by comment ID %d: %w", id, err)
 	}
@@ -315,9 +316,9 @@ func (m *CommentModel) GetCommentByCommentID(id int64) ([]models.Comment, error)
 	return comments, nil
 }
 
-func (m *CommentModel) All() ([]models.Comment, error) {
+func (m *CommentModel) All(ctx context.Context) ([]models.Comment, error) {
 	// Begin the transaction
-	tx, err := m.DB.Begin()
+	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction for All in Comments: %w", err)
 	}
@@ -332,7 +333,7 @@ func (m *CommentModel) All() ([]models.Comment, error) {
 		return nil, fmt.Errorf("database connection is not initialized")
 	}
 
-	rows, selectErr := m.DB.Query(stmt)
+	rows, selectErr := m.DB.QueryContext(ctx, stmt)
 	if selectErr != nil {
 		return nil, fmt.Errorf("failed to query all comments: %w", selectErr)
 	}
@@ -383,29 +384,29 @@ func (m *CommentModel) All() ([]models.Comment, error) {
 }
 
 // GetComment checks if a user has already commented on a post or comment. It retrieves already existing reactions.
-func (m *CommentModel) GetComment(authorID int, reactedPostID int, reactedCommentID int64) (*models.Reaction, error) {
+func (m *CommentModel) GetComment(ctx context.Context, authorID int, reactedPostID int, reactedCommentID int64) (*models.Reaction, error) {
 	var reaction models.Reaction
 	var stmt string
 
 	// Build the SQL query depending on whether the reaction is to a post or comment
 	if reactedPostID != 0 {
-		stmt = `SELECT ID, Created, AuthorID, CommentedPostID, CommentedCommentID, IsCommentable, IsFlagged 
-				FROM Comments 
-				WHERE AuthorID = ? AND 
+		stmt = `SELECT ID, Created, AuthorID, CommentedPostID, CommentedCommentID, IsCommentable, IsFlagged
+				FROM Comments
+				WHERE AuthorID = ? AND
 				      CommentedPostID = ?`
 	} else if reactedCommentID != 0 {
-		stmt = `SELECT ID, Liked, Disliked, AuthorID, Created, ReactedPostID, ReactedCommentID 
-				FROM Reactions 
-				WHERE AuthorID = ? AND 
+		stmt = `SELECT ID, Liked, Disliked, AuthorID, Created, ReactedPostID, ReactedCommentID
+				FROM Reactions
+				WHERE AuthorID = ? AND
 				      CommentedCommentID = ?`
 	} else {
 		return nil, nil
 	}
 
 	// Query the database
-	row := m.DB.QueryRow(stmt, authorID, reactedPostID)
+	row := m.DB.QueryRowContext(ctx, stmt, authorID, reactedPostID)
 	if reactedCommentID != 0 {
-		row = m.DB.QueryRow(stmt, authorID, reactedCommentID)
+		row = m.DB.QueryRowContext(ctx, stmt, authorID, reactedCommentID)
 	}
 
 	err := row.Scan(&reaction.ID, &reaction.Liked, &reaction.Disliked, &reaction.AuthorID, &reaction.Created, &reaction.ReactedPostID, &reaction.ReactedCommentID)

@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 )
 
 func TestReactionModelUpsert(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		DB *sql.DB
 	}
@@ -59,7 +61,7 @@ func TestReactionModelUpsert(t *testing.T) {
 			m := &ReactionModel{
 				DB: tt.fields.DB,
 			}
-			err := m.Upsert(tt.args.liked, tt.args.disliked, tt.args.authorID, tt.args.reactedPostID, tt.args.reactedCommentID)
+			err := m.Upsert(ctx, tt.args.liked, tt.args.disliked, tt.args.authorID, tt.args.reactedPostID, tt.args.reactedCommentID)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Upsert() error = %v, wantErr %v", err, tt.wantErr)
 			}

@@ -21,6 +21,7 @@ type UserHandler struct {
 }
 
 func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	w.Header().Set("Content-Type", "application/json")
 
 	// Fetch User ID from the URL as string
@@ -34,9 +35,9 @@ func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userLoggedIn := true
-	currentUser, ok := mw.GetUserFromContext(r.Context())
+	currentUser, ok := mw.GetUserFromContext(ctx)
 	if !ok {
-		models.LogWarnWithContext(r.Context(), "User not authenticated in GetThisUser")
+		models.LogWarnWithContext(ctx, "User not authenticated in GetThisUser")
 		userLoggedIn = false
 	}
 
@@ -46,7 +47,7 @@ func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
 	// }
 
 	// Fetch the thisUser
-	thisUser, err := u.App.Users.GetUserByID(userID)
+	thisUser, err := u.App.Users.GetUserByID(ctx, userID)
 	if err != nil {
 		view.RenderErrorPage(w, models.NotFoundLocation("user"), 400, models.NotFoundError(userID, "GetThisUser", err))
 	}
@@ -54,14 +55,14 @@ func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
 	// Fetch thisUser loyalty
 	if err == nil {
 
-		thisUser.Followers, thisUser.Following, err = u.App.Loyalty.CountUsers(thisUser.ID)
+		thisUser.Followers, thisUser.Following, err = u.App.Loyalty.CountUsers(ctx, thisUser.ID)
 		if err != nil {
 			view.RenderErrorPage(w, models.NotFoundLocation("user"), 500, models.FetchError("thisUser loyalty", "GetThisUser", err))
 		}
 	}
 
 	// Fetch thisUser userPosts
-	userPosts, err := u.App.Posts.GetPostsByUserID(thisUser.ID)
+	userPosts, err := u.App.Posts.GetPostsByUserID(ctx, thisUser.ID)
 	if err != nil {
 		view.RenderErrorPage(w, models.NotFoundLocation("user"), 500, models.FetchError("thisUser userPosts", "GetThisUser", err))
 	}
@@ -88,15 +89,15 @@ func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
 	// Fetch thisUser post comments
 	userPosts, err = u.Comment.GetPostsComments(userPosts)
 	if err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to fetch post comments", err)
+		models.LogErrorWithContext(ctx, "Failed to fetch post comments", err)
 	}
 
 	models.UpdateTimeSince(&thisUser)
 
 	// SECTION --- channels --
-	allChannels, err := u.App.Channels.All()
+	allChannels, err := u.App.Channels.All(ctx)
 	if err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to fetch all channels", err)
+		models.LogErrorWithContext(ctx, "Failed to fetch all channels", err)
 	}
 	for c := range allChannels {
 		models.UpdateTimeSince(allChannels[c])
@@ -117,23 +118,23 @@ func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
 	// var userPosts []models.Post
 
 	if userLoggedIn {
-		currentUser.Followers, currentUser.Following, err = u.App.Loyalty.CountUsers(currentUser.ID)
+		currentUser.Followers, currentUser.Following, err = u.App.Loyalty.CountUsers(ctx, currentUser.ID)
 		if err != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to count current user loyalty", err)
+			models.LogErrorWithContext(ctx, "Failed to count current user loyalty", err)
 		}
 
 		// get owned and joined channels of current thisUser
-		memberships, memberErr := u.App.Memberships.UserMemberships(currentUser.ID)
+		memberships, memberErr := u.App.Memberships.UserMemberships(ctx, currentUser.ID)
 		if memberErr != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to fetch user memberships", memberErr)
+			models.LogErrorWithContext(ctx, "Failed to fetch user memberships", memberErr)
 		}
-		ownedChannels, err = u.App.Channels.OwnedOrJoinedByCurrentUser(currentUser.ID)
+		ownedChannels, err = u.App.Channels.OwnedOrJoinedByCurrentUser(ctx, currentUser.ID)
 		if err != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to fetch user owned channels", err)
+			models.LogErrorWithContext(ctx, "Failed to fetch user owned channels", err)
 		}
 		joinedChannels, err = u.Channel.JoinedByCurrentUser(memberships)
 		if err != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to fetch user joined channels", err)
+			models.LogErrorWithContext(ctx, "Failed to fetch user joined channels", err)
 		}
 
 		// ownedAndJoinedChannels = append(ownedChannels, joinedChannels...)
@@ -176,6 +177,7 @@ func (u *UserHandler) GetThisUser(w http.ResponseWriter, r *http.Request) {
 
 // GetLoggedInUser gets the currently logged-in user from the session token and returns the user's struct
 func (u *UserHandler) GetLoggedInUser(r *http.Request) (*models.User, error) {
+	ctx := r.Context()
 	// Get the username from the request cookie
 	userCookie, getCookieErr := r.Cookie("username")
 	if getCookieErr != nil {
@@ -189,7 +191,7 @@ func (u *UserHandler) GetLoggedInUser(r *http.Request) (*models.User, error) {
 	if username == "" {
 		return nil, errors.New("no user is logged in")
 	}
-	user, getUserErr := u.App.Users.GetUserByUsername(username, "GetLoggedInUser")
+	user, getUserErr := u.App.Users.GetUserByUsername(ctx, username, "GetLoggedInUser")
 	if getUserErr != nil {
 		return nil, getUserErr
 	}
@@ -197,21 +199,22 @@ func (u *UserHandler) GetLoggedInUser(r *http.Request) (*models.User, error) {
 }
 
 func (u *UserHandler) EditUserDetails(w http.ResponseWriter, r *http.Request) {
-	user, ok := mw.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user, ok := mw.GetUserFromContext(ctx)
 	if !ok {
-		models.LogErrorWithContext(r.Context(), "User not found in context for EditUserDetails", nil)
+		models.LogErrorWithContext(ctx, "User not found in context for EditUserDetails", nil)
 		return
 	}
 
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to parse multipart form in EditUserDetails", err)
+		models.LogErrorWithContext(ctx, "Failed to parse multipart form in EditUserDetails", err)
 		http.Error(w, err.Error(), 400)
 		return
 	}
 	currentAvatar := user.Avatar
 	prefix := "noimage"
-	models.LogInfoWithContext(r.Context(), "Current avatar: %v", currentAvatar)
+	models.LogInfoWithContext(ctx, "Current avatar: %v", currentAvatar)
 	user.Avatar = GetFileName(r, "file-drop", "editUserDetails", "user")
 	// TODO does this check need to be here?
 	if strings.HasPrefix(currentAvatar, prefix) {
@@ -225,13 +228,13 @@ func (u *UserHandler) EditUserDetails(w http.ResponseWriter, r *http.Request) {
 	if currentName != "" {
 		user.Username = currentName
 	}
-	editErr := u.App.Users.Edit(user)
+	editErr := u.App.Users.Edit(ctx, user)
 	if editErr != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to edit user details", editErr)
+		models.LogErrorWithContext(ctx, "Failed to edit user details", editErr)
 	}
 	ephemeral := true
-	if err, _ := u.App.Cookies.CreateCookies(w, user, ephemeral); err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to create cookies", err)
+	if err, _ := u.App.Cookies.CreateCookies(ctx, w, user, ephemeral); err != nil {
+		models.LogErrorWithContext(ctx, "Failed to create cookies", err)
 	}
 	http.Redirect(w, r, "/", http.StatusFound)
 }

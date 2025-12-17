@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -13,9 +14,9 @@ type UserModel struct {
 	DB *sql.DB
 }
 
-func CountUsers(db *sql.DB) (int, error) {
+func CountUsers(ctx context.Context, db *sql.DB) (int, error) {
 	var count int
-	err := db.QueryRow(`SELECT COUNT(*) FROM ID`).Scan(&count)
+	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM ID`).Scan(&count)
 	if err != nil {
 		return 0, err
 	}
@@ -23,11 +24,11 @@ func CountUsers(db *sql.DB) (int, error) {
 }
 
 // Insert adds a new user to the database
-func (m *UserModel) Insert(id models.UUIDField, username, email, avatar, banner, description, userType, sessionToken, crsfToken, password string) error {
+func (m *UserModel) Insert(ctx context.Context, id models.UUIDField, username, email, avatar, banner, description, userType, sessionToken, crsfToken, password string) error {
 	// Note: Direct Exec() is more efficient than Prepare() for single-use queries
 	query := "INSERT INTO Users (ID, Username, EmailAddress, Avatar, Banner, Description, UserType, Created, IsFlagged, SessionToken, CsrfToken, HashedPassword) VALUES (?, ?, ?, ?, ?, ?, ?, DateTime('now'), 0, ?, ?, ?)"
 
-	_, err := m.DB.Exec(query, id, username, email, avatar, banner, description, userType, sessionToken, crsfToken, password)
+	_, err := m.DB.ExecContext(ctx, query, id, username, email, avatar, banner, description, userType, sessionToken, crsfToken, password)
 	if err != nil {
 		return fmt.Errorf("failed to insert user %s: %w", username, err)
 	}
@@ -36,10 +37,10 @@ func (m *UserModel) Insert(id models.UUIDField, username, email, avatar, banner,
 	return nil
 }
 
-func (m *UserModel) Edit(user *models.User) error {
+func (m *UserModel) Edit(ctx context.Context, user *models.User) error {
 	query := "UPDATE Users SET Username = ?, EmailAddress = ?, HashedPassword = ?, SessionToken = ?, CsrfToken = ?, Avatar = ?, Banner = ?, Description = ? WHERE ID = ?"
 
-	result, err := m.DB.Exec(query, user.Username, user.Email, user.HashedPassword, user.SessionToken, user.CSRFToken, user.Avatar, user.Banner, user.Description, user.ID)
+	result, err := m.DB.ExecContext(ctx, query, user.Username, user.Email, user.HashedPassword, user.SessionToken, user.CSRFToken, user.Avatar, user.Banner, user.Description, user.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update user %s: %w", user.Username, err)
 	}
@@ -53,10 +54,10 @@ func (m *UserModel) Edit(user *models.User) error {
 	return nil
 }
 
-func (m *UserModel) Delete(user *models.User) error {
+func (m *UserModel) Delete(ctx context.Context, user *models.User) error {
 	query := "DELETE FROM Users WHERE ID = ?"
 
-	result, err := m.DB.Exec(query, user.ID)
+	result, err := m.DB.ExecContext(ctx, query, user.ID)
 	if err != nil {
 		return fmt.Errorf("failed to delete user %s: %w", user.Username, err)
 	}
@@ -70,23 +71,23 @@ func (m *UserModel) Delete(user *models.User) error {
 	return nil
 }
 
-func (m *UserModel) GetUserFromLogin(login, calledBy string) (*models.User, error) {
+func (m *UserModel) GetUserFromLogin(ctx context.Context, login, calledBy string) (*models.User, error) {
 	if m == nil || m.DB == nil {
 		return nil, fmt.Errorf("error connecting to database called by: %s", calledBy)
 	}
 	username, email := login, login
 	var loginType string
-	usernameQuery, ok, _ := m.QueryUserNameExists(username)
+	usernameQuery, ok, _ := m.QueryUserNameExists(ctx, username)
 	if ok {
 		loginType = usernameQuery
 	}
-	emailQuery, ok, _ := m.QueryUserEmailExists(email)
+	emailQuery, ok, _ := m.QueryUserEmailExists(ctx, email)
 	if ok {
 		loginType = emailQuery
 	}
 	switch loginType {
 	case "username":
-		user, err := m.GetUserByUsername(username, "GetUserFromLogin")
+		user, err := m.GetUserByUsername(ctx, username, "GetUserFromLogin")
 		if err != nil {
 			return nil, fmt.Errorf("failed to get user by username: %w", err)
 		} else {
@@ -94,7 +95,7 @@ func (m *UserModel) GetUserFromLogin(login, calledBy string) (*models.User, erro
 			return user, nil
 		}
 	case "email":
-		user, err := m.GetUserByEmail(email, "GetUserFromLogin")
+		user, err := m.GetUserByEmail(ctx, email, "GetUserFromLogin")
 		if err != nil {
 			return nil, fmt.Errorf("failed to get user by email: %w", err)
 		} else {
@@ -106,14 +107,14 @@ func (m *UserModel) GetUserFromLogin(login, calledBy string) (*models.User, erro
 	}
 }
 
-func (m *UserModel) QueryUserNameExists(username string) (string, bool, error) {
+func (m *UserModel) QueryUserNameExists(ctx context.Context, username string) (string, bool, error) {
 	if m == nil || m.DB == nil {
 		err := fmt.Errorf("error connecting to database: %s", "QueryUserNameExists")
 		return "", false, err
 
 	}
 	var count int
-	queryErr := m.DB.QueryRow("SELECT COUNT(*) FROM Users WHERE Username = ?", username).Scan(&count)
+	queryErr := m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM Users WHERE Username = ?", username).Scan(&count)
 	if queryErr != nil {
 		return "", false, fmt.Errorf("failed to query user by username: %w", queryErr)
 	}
@@ -123,13 +124,13 @@ func (m *UserModel) QueryUserNameExists(username string) (string, bool, error) {
 	return "", false, nil
 }
 
-func (m *UserModel) QueryUserEmailExists(email string) (string, bool, error) {
+func (m *UserModel) QueryUserEmailExists(ctx context.Context, email string) (string, bool, error) {
 	if m == nil || m.DB == nil {
 		err := fmt.Errorf("error connecting to database: %s", "QueryUserEmailExists")
 		return "", false, err
 	}
 	var count int
-	queryErr := m.DB.QueryRow("SELECT COUNT(*) FROM Users WHERE EmailAddress = ?", email).Scan(&count)
+	queryErr := m.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM Users WHERE EmailAddress = ?", email).Scan(&count)
 	if queryErr != nil {
 		return "", false, fmt.Errorf("failed to query user by email: %w", queryErr)
 	}
@@ -141,7 +142,7 @@ func (m *UserModel) QueryUserEmailExists(email string) (string, bool, error) {
 
 // TODO unify these functions to accept parameters
 
-func (m *UserModel) GetUserByUsername(username, calledBy string) (*models.User, error) {
+func (m *UserModel) GetUserByUsername(ctx context.Context, username, calledBy string) (*models.User, error) {
 	username = strings.TrimSpace(username)
 	if m == nil || m.DB == nil {
 		return nil, fmt.Errorf("database not initialized in GetUserByUsername for %s", username)
@@ -150,7 +151,7 @@ func (m *UserModel) GetUserByUsername(username, calledBy string) (*models.User, 
 	query := "SELECT ID, Username, EmailAddress, Avatar, Banner, Description, Usertype, Created, Updated, IsFlagged, SessionToken, CSRFToken, HashedPassword FROM Users WHERE Username = ? LIMIT 1"
 	var user models.User
 
-	err := m.DB.QueryRow(query, username).Scan(
+	err := m.DB.QueryRowContext(ctx, query, username).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
@@ -175,7 +176,7 @@ func (m *UserModel) GetUserByUsername(username, calledBy string) (*models.User, 
 	return &user, nil
 }
 
-func (m *UserModel) GetUserByEmail(email, calledBy string) (*models.User, error) {
+func (m *UserModel) GetUserByEmail(ctx context.Context, email, calledBy string) (*models.User, error) {
 	email = strings.TrimSpace(email)
 	if m == nil || m.DB == nil {
 		return nil, fmt.Errorf("database not initialized in GetUserByEmail for %s", email)
@@ -184,7 +185,7 @@ func (m *UserModel) GetUserByEmail(email, calledBy string) (*models.User, error)
 	query := "SELECT ID, HashedPassword, EmailAddress FROM Users WHERE EmailAddress = ? LIMIT 1"
 	var user models.User
 
-	err := m.DB.QueryRow(query, email).Scan(
+	err := m.DB.QueryRowContext(ctx, query, email).Scan(
 		&user.ID,
 		&user.HashedPassword,
 		&user.Email)
@@ -199,9 +200,9 @@ func (m *UserModel) GetUserByEmail(email, calledBy string) (*models.User, error)
 	return &user, nil
 }
 
-func (m *UserModel) GetUserByID(ID models.UUIDField) (models.User, error) {
+func (m *UserModel) GetUserByID(ctx context.Context, ID models.UUIDField) (models.User, error) {
 	stmt := "SELECT ID, Username, EmailAddress, Avatar, Banner, Description, Usertype, Created, Updated, IsFlagged, SessionToken, CSRFToken, HashedPassword FROM Users WHERE ID = ?"
-	row := m.DB.QueryRow(stmt, ID)
+	row := m.DB.QueryRowContext(ctx, stmt, ID)
 	u := models.User{}
 	err := row.Scan(
 		&u.ID,
@@ -245,7 +246,7 @@ func isValidUserColumn(column string) bool {
 }
 
 // GetSingleUserValue returns the string of the column specified in output, which should be entered in all lower case
-func (m *UserModel) GetSingleUserValue(ID models.UUIDField, searchColumn, outputColumn string) (string, error) {
+func (m *UserModel) GetSingleUserValue(ctx context.Context, ID models.UUIDField, searchColumn, outputColumn string) (string, error) {
 	if !isValidUserColumn(searchColumn) {
 		return "", fmt.Errorf("invalid searchColumn name: %s", searchColumn)
 	}
@@ -253,7 +254,7 @@ func (m *UserModel) GetSingleUserValue(ID models.UUIDField, searchColumn, output
 		"SELECT ID, Username, EmailAddress, Avatar, Banner, Description, Usertype, Created, IsFlagged, SessionToken, CSRFToken, HashedPassword FROM Users WHERE %s = ?",
 		searchColumn,
 	)
-	rows, queryErr := m.DB.Query(stmt, ID)
+	rows, queryErr := m.DB.QueryContext(ctx, stmt, ID)
 	if queryErr != nil {
 		return "", fmt.Errorf("failed to query user for column %s: %w", searchColumn, queryErr)
 	}
@@ -301,9 +302,9 @@ func (m *UserModel) GetSingleUserValue(ID models.UUIDField, searchColumn, output
 	return outputValue, nil
 }
 
-func (m *UserModel) All() ([]*models.User, error) {
+func (m *UserModel) All(ctx context.Context) ([]*models.User, error) {
 	stmt := "SELECT ID, Username, EmailAddress, Avatar, Banner, Description, Usertype, Created, Updated, IsFlagged, SessionToken, CSRFToken, HashedPassword FROM Users ORDER BY ID DESC"
-	rows, queryErr := m.DB.Query(stmt)
+	rows, queryErr := m.DB.QueryContext(ctx, stmt)
 	if queryErr != nil {
 		return nil, fmt.Errorf("failed to query all users: %w", queryErr)
 	}

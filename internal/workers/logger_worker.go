@@ -114,6 +114,7 @@ func (pool *LoggerPool) Shutdown(ctx context.Context) error {
 
 // writeLog processes a single log entry and writes it to the database
 func (pool *LoggerPool) writeLog(entry LogEntry, workerID int) {
+	ctx := context.Background() // Use background context for DB operations
 	if pool.loggingModel == nil {
 		return // No database in test environment
 	}
@@ -123,15 +124,15 @@ func (pool *LoggerPool) writeLog(entry LogEntry, workerID int) {
 	switch entry.Type {
 	case "request":
 		if entry.RequestLog != nil {
-			err = pool.loggingModel.InsertRequestLog(*entry.RequestLog)
+			err = pool.loggingModel.InsertRequestLog(ctx, *entry.RequestLog)
 		}
 	case "error":
 		if entry.ErrorLog != nil {
-			err = pool.loggingModel.InsertErrorLog(*entry.ErrorLog)
+			err = pool.loggingModel.InsertErrorLog(ctx, *entry.ErrorLog)
 		}
 	case "metric":
 		if entry.SystemMetric != nil {
-			err = pool.loggingModel.InsertSystemMetric(*entry.SystemMetric)
+			err = pool.loggingModel.InsertSystemMetric(ctx, *entry.SystemMetric)
 		}
 	}
 

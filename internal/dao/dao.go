@@ -34,7 +34,7 @@ func (dao *DAO[T]) All(ctx context.Context) ([]T, error) {
 	return scanRowsToStructs[T](rows)
 }
 
-func (dao *DAO[T]) GetByID(ctx context.Context, id int64) (*T, error) {
+func (dao *DAO[T]) GetByID(ctx context.Context, id models.UUIDField) (*T, error) {
 	var model T
 	query := fmt.Sprintf("SELECT * FROM %s WHERE id = ?", model.TableName())
 

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -19,26 +20,27 @@ type PostHandler struct {
 	Reaction *ReactionHandler
 }
 
+// INFO: This method doesn't have access to context, so logging uses background context
 // GetUserPosts returns a slice of Posts that belong to channels the user follows. If no user is logged in, it returns all posts
-// Note: This method doesn't have access to context, so logging uses background context
 func (p *PostHandler) GetUserPosts(user *models.User, allPosts []*models.Post) []*models.Post {
+	ctx := context.Background()
 	if user == nil {
 		return allPosts
 	}
 
-	memberships, memberErr := p.App.Memberships.UserMemberships(user.ID)
+	memberships, memberErr := p.App.Memberships.UserMemberships(ctx, user.ID)
 	if memberErr != nil {
-		models.LogErrorWithContext(nil, "Failed to fetch user memberships in GetUserPosts", memberErr)
+		models.LogErrorWithContext(ctx, "Failed to fetch user memberships in GetUserPosts", memberErr)
 		return allPosts
 	}
-	ownedChannels, ownedErr := p.App.Channels.OwnedOrJoinedByCurrentUser(user.ID)
+	ownedChannels, ownedErr := p.App.Channels.OwnedOrJoinedByCurrentUser(ctx, user.ID)
 	if ownedErr != nil {
-		models.LogErrorWithContext(nil, "Failed to fetch user owned channels in GetUserPosts", ownedErr)
+		models.LogErrorWithContext(ctx, "Failed to fetch user owned channels in GetUserPosts", ownedErr)
 		return allPosts
 	}
 	joinedChannels, joinedErr := p.Channel.JoinedByCurrentUser(memberships)
 	if joinedErr != nil {
-		models.LogErrorWithContext(nil, "Failed to fetch user joined channels", joinedErr)
+		models.LogErrorWithContext(ctx, "Failed to fetch user joined channels", joinedErr)
 		return allPosts
 	}
 
@@ -68,7 +70,9 @@ func (p *PostHandler) GetUserPosts(user *models.User, allPosts []*models.Post) [
 	return postsInUserChannels
 }
 
+// GetThisPost handles the retrieval and rendering of a single post based on its ID from the URL.
 func (p *PostHandler) GetThisPost(w http.ResponseWriter, r *http.Request) {
+	var ctx = r.Context()
 	w.Header().Set("Content-Type", "application/json")
 	var thisPost *models.Post
 	var posts []*models.Post
@@ -77,9 +81,9 @@ func (p *PostHandler) GetThisPost(w http.ResponseWriter, r *http.Request) {
 	isOwner := false
 
 	userLoggedIn := true
-	currentUser, ok := mw.GetUserFromContext(r.Context())
+	currentUser, ok := mw.GetUserFromContext(ctx)
 	if !ok {
-		models.LogInfoWithContext(r.Context(), "User not found in context for GetThisPost")
+		models.LogInfoWithContext(ctx, "User not found in context for GetThisPost")
 		userLoggedIn = false
 	}
 
@@ -91,7 +95,7 @@ func (p *PostHandler) GetThisPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch the post
-	post, err := p.App.Posts.GetPostByID(postID)
+	post, err := p.App.Posts.GetPostByID(ctx, postID)
 	if err != nil {
 		view.RenderErrorPage(w, models.NotFoundLocation("post"), 400, models.NotFoundError(postID, "GetThisPost", err))
 		return
@@ -112,24 +116,24 @@ func (p *PostHandler) GetThisPost(w http.ResponseWriter, r *http.Request) {
 	models.UpdateTimeSince(thisPost)
 
 	// Fetch the channel
-	channel, err := p.App.Channels.GetChannelByID(thisPost.ChannelID)
+	channel, err := p.App.Channels.GetChannelByID(ctx, thisPost.ChannelID)
 	if err != nil {
 		view.RenderErrorPage(w, models.NotFoundLocation("post"), 500, models.QueryError("channels", "GetThisPost", err))
 	}
 
 	// Fetch the author
-	author, err := p.App.Users.GetUserByUsername(thisPost.Author, "GetThisPost")
+	author, err := p.App.Users.GetUserByUsername(ctx, thisPost.Author, "GetThisPost")
 	if err != nil {
 		view.RenderErrorPage(w, models.NotFoundLocation("post"), 500, models.QueryError("users", "GetThisPost", err))
 	}
 
 	if userLoggedIn {
-		currentUser.Followers, currentUser.Following, err = p.App.Loyalty.CountUsers(currentUser.ID)
+		currentUser.Followers, currentUser.Following, err = p.App.Loyalty.CountUsers(ctx, currentUser.ID)
 		if err != nil {
 			view.RenderErrorPage(w, models.NotFoundLocation("post"), 500, models.FetchError("user loyalty", "GetThisPost", err))
 		}
 		// Fetch if the user is a member of the channel
-		isMember, isMemberErr = p.App.Channels.IsUserMemberOfChannel(currentUser.ID, channel.ID)
+		isMember, isMemberErr = p.App.Channels.IsUserMemberOfChannel(ctx, currentUser.ID, channel.ID)
 		if isMemberErr != nil {
 			view.RenderErrorPage(w, models.NotFoundLocation("post"), 500, models.QueryError("user membership", "GetThisPost", err))
 		}
@@ -152,29 +156,31 @@ func (p *PostHandler) GetThisPost(w http.ResponseWriter, r *http.Request) {
 	view.RenderPageData(w, data)
 }
 
+// StorePost handles the creation of a new post.
 func (p *PostHandler) StorePost(w http.ResponseWriter, r *http.Request) {
-	user, ok := mw.GetUserFromContext(r.Context())
+	var ctx = r.Context()
+	user, ok := mw.GetUserFromContext(ctx)
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to parse multipart form in StorePost", err)
+		models.LogErrorWithContext(ctx, "Failed to parse multipart form in StorePost", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	channels := r.MultipartForm.Value["post_channel_list"]
 	if len(channels) < 1 {
-		models.LogErrorWithContext(r.Context(), "At least one channel required", fmt.Errorf("at least one channel required"))
+		models.LogErrorWithContext(ctx, "At least one channel required", fmt.Errorf("at least one channel required"))
 		return
 	}
 
 	title := strings.TrimSpace(r.FormValue("title"))
 	content := strings.TrimSpace(r.FormValue("content"))
 	if title == "" || content == "" {
-		models.LogErrorWithContext(r.Context(), "Title and content are required", fmt.Errorf("title and content are required"))
+		models.LogErrorWithContext(ctx, "Title and content are required", fmt.Errorf("title and content are required"))
 		return
 	}
 
@@ -192,6 +198,7 @@ func (p *PostHandler) StorePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	postID, err := p.App.Posts.Insert(
+		ctx,
 		createPostData.Title,
 		createPostData.Content,
 		createPostData.Images,
@@ -202,7 +209,7 @@ func (p *PostHandler) StorePost(w http.ResponseWriter, r *http.Request) {
 		createPostData.IsFlagged,
 	)
 	if err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to insert post", err)
+		models.LogErrorWithContext(ctx, "Failed to insert post", err)
 		//TODO: internal server errors should be handled better and redirect to NotFound page
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -214,8 +221,8 @@ func (p *PostHandler) StorePost(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid channel id", http.StatusBadRequest)
 			return
 		}
-		if err := p.App.Channels.AddPostToChannel(channelID, postID); err != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to add post to channel", err, "postID", postID, "channelID", channelID)
+		if err := p.App.Channels.AddPostToChannel(ctx, channelID, postID); err != nil {
+			models.LogErrorWithContext(ctx, "Failed to add post to channel", err, "postID", postID, "channelID", channelID)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

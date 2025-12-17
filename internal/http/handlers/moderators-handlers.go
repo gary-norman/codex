@@ -36,19 +36,20 @@ func writeJSONResponse(w http.ResponseWriter, statusCode int, message string) {
 }
 
 func (m *ModHandler) RequestModeration(w http.ResponseWriter, r *http.Request, channelID int64) {
-	currentUser, ok := mw.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	currentUser, ok := mw.GetUserFromContext(ctx)
 	if !ok {
-		models.LogWarnWithContext(r.Context(), "Current user not found in context for moderation request")
+		models.LogWarnWithContext(ctx, "Current user not found in context for moderation request")
 		return
 	}
-	channelOwner, err := m.App.Channels.GetNameOfChannelOwner(channelID)
+	channelOwner, err := m.App.Channels.GetNameOfChannelOwner(ctx, channelID)
 	if err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to fetch channel owner", err)
+		models.LogErrorWithContext(ctx, "Failed to fetch channel owner", err)
 	}
 
-	channel, err := m.App.Channels.GetChannelByID(channelID)
+	channel, err := m.App.Channels.GetChannelByID(ctx, channelID)
 	if err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to fetch channel", err)
+		models.LogErrorWithContext(ctx, "Failed to fetch channel", err)
 		http.Error(w, `{"error": "channel not found"}`, http.StatusNotFound)
 		return
 	}
@@ -61,10 +62,10 @@ func (m *ModHandler) RequestModeration(w http.ResponseWriter, r *http.Request, c
 	case false:
 		// call the  AddModeration function
 		if m.App.Mods.AddModeration(currentUser.ID, channelID) != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to add moderation", err)
+			models.LogErrorWithContext(ctx, "Failed to add moderation", err)
 		}
 		writeJSONResponse(w, http.StatusOK, fmt.Sprintf("Welcome to %s!", channel.Name))
 	default:
-		models.LogWarnWithContext(r.Context(), "Channel privacy value is neither true nor false")
+		models.LogWarnWithContext(ctx, "Channel privacy value is neither true nor false")
 	}
 }

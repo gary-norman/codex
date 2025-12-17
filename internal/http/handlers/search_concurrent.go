@@ -57,7 +57,7 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 		var users []*models.User
 		err := app.DBCircuit.Execute(func() error {
 			var execErr error
-			users, execErr = app.Users.All()
+			users, execErr = app.Users.All(ctx)
 			return execErr
 		})
 		if err != nil {
@@ -81,7 +81,7 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 		var posts []*models.Post
 		err := app.DBCircuit.Execute(func() error {
 			var execErr error
-			posts, execErr = app.Posts.All()
+			posts, execErr = app.Posts.All(ctx)
 			return execErr
 		})
 		if err != nil {
@@ -105,7 +105,7 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 		var channels []*models.Channel
 		err := app.DBCircuit.Execute(func() error {
 			var execErr error
-			channels, execErr = app.Channels.All()
+			channels, execErr = app.Channels.All(ctx)
 			return execErr
 		})
 		if err != nil {
@@ -159,6 +159,7 @@ func ConcurrentSearch(ctx context.Context, app *app.App) (*SearchResult, error) 
 // enrichPostsWithChannels adds channel information to posts
 // This should run AFTER concurrent search completes
 func enrichPostsWithChannels(app *app.App, posts []*models.Post, channels []*models.Channel) []*models.Post {
+	ctx := context.Background()
 	// Create channel lookup map for O(1) access instead of O(n²) nested loops
 	channelMap := make(map[int64]*models.Channel)
 	for _, ch := range channels {
@@ -168,7 +169,7 @@ func enrichPostsWithChannels(app *app.App, posts []*models.Post, channels []*mod
 	// Enrich posts with channel data
 	for i := range posts {
 		// Get channel IDs for this post
-		channelIDs, err := app.Channels.GetChannelIDFromPost(posts[i].ID)
+		channelIDs, err := app.Channels.GetChannelIDFromPost(ctx, posts[i].ID)
 		if err != nil || len(channelIDs) == 0 {
 			continue
 		}

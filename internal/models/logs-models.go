@@ -30,8 +30,8 @@ func GetRequestID(ctx context.Context) string {
 func LogInfo(msg string, args ...any) {
 	timestamp := time.Now().Format("15:04:05")
 	formattedMsg := formatMessageWithBlueArgs(msg, args...)
-	formatted := fmt.Sprintf("%s%s%s ℹ️  %s",
-		Colors.Subtext0, timestamp, Colors.Reset,
+	formatted := fmt.Sprintf("%s%s%s [ℹ INFO] %s%s",
+		Colors.Subtext0, timestamp, Colors.Green, Colors.Reset,
 		formattedMsg)
 	log.Println(formatted)
 }
@@ -41,8 +41,8 @@ func LogInfo(msg string, args ...any) {
 func LogWarn(msg string, args ...any) {
 	timestamp := time.Now().Format("15:04:05")
 	formattedMsg := formatMessageWithBlueArgs(msg, args...)
-	formatted := fmt.Sprintf("%s%s%s ⚠️  %s",
-		Colors.Subtext0, timestamp, Colors.Reset,
+	formatted := fmt.Sprintf("%s%s%s [⚠ WARN] %s%s",
+		Colors.Subtext0, timestamp, Colors.Peach, Colors.Reset,
 		formattedMsg)
 	log.Println(formatted)
 }
@@ -52,8 +52,8 @@ func LogWarn(msg string, args ...any) {
 func LogError(msg string, err error, args ...any) {
 	timestamp := time.Now().Format("15:04:05")
 	formattedMsg := formatMessageWithBlueArgs(msg, args...)
-	formatted := fmt.Sprintf("%s%s%s ❌ %s",
-		Colors.Subtext0, timestamp, Colors.Reset,
+	formatted := fmt.Sprintf("%s%s%s [✘ FAIL] %s%s",
+		Colors.Subtext0, timestamp, Colors.Red, Colors.Reset,
 		formattedMsg)
 	if err != nil {
 		formatted += fmt.Sprintf(" %s%v%s", Colors.Text, err, Colors.Reset)
@@ -81,8 +81,8 @@ func LogInfoWithContext(ctx context.Context, msg string, args ...any) {
 	formattedMsg := formatMessageWithBlueArgs(msg, args...)
 
 	if requestID != "" {
-		formatted := fmt.Sprintf("%s%s%s ℹ️  %s[%s]%s %s",
-			Colors.Subtext0, timestamp, Colors.Reset,
+		formatted := fmt.Sprintf("%s%s%s [ℹ INFO] %s%s[%s]%s %s",
+			Colors.Subtext0, timestamp, Colors.Green, Colors.Reset,
 			Colors.Green, requestID, Colors.Reset,
 			formattedMsg)
 		log.Println(formatted)
@@ -99,8 +99,8 @@ func LogWarnWithContext(ctx context.Context, msg string, args ...any) {
 	formattedMsg := formatMessageWithBlueArgs(msg, args...)
 
 	if requestID != "" {
-		formatted := fmt.Sprintf("%s%s%s ⚠️  %s[%s]%s %s",
-			Colors.Subtext0, timestamp, Colors.Reset,
+		formatted := fmt.Sprintf("%s%s%s [⚠ WARN] %s%s[%s]%s %s",
+			Colors.Subtext0, timestamp, Colors.Peach, Colors.Reset,
 			Colors.Peach, requestID, Colors.Reset,
 			formattedMsg)
 		log.Println(formatted)
@@ -117,8 +117,8 @@ func LogErrorWithContext(ctx context.Context, msg string, err error, args ...any
 	formattedMsg := formatMessageWithBlueArgs(msg, args...)
 
 	if requestID != "" {
-		formatted := fmt.Sprintf("%s%s%s ❌ %s[%s]%s %s",
-			Colors.Subtext0, timestamp, Colors.Reset,
+		formatted := fmt.Sprintf("%s%s%s [✘ FAIL] %s%s[%s]%s %s",
+			Colors.Subtext0, timestamp, Colors.Red, Colors.Reset,
 			Colors.Red, requestID, Colors.Reset,
 			formattedMsg)
 		if err != nil {

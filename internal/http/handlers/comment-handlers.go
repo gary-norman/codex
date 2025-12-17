@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -19,8 +20,9 @@ type CommentHandler struct {
 }
 
 func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	// SECTION getting user
-	user, ok := mw.GetUserFromContext(r.Context())
+	user, ok := mw.GetUserFromContext(ctx)
 	if !ok {
 		http.Error(w, "No user found in context", http.StatusUnauthorized)
 		return
@@ -33,7 +35,7 @@ func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
 	parseErr := r.ParseMultipartForm(10 << 20)
 	if parseErr != nil {
 		http.Error(w, parseErr.Error(), 400)
-		models.LogErrorWithContext(r.Context(), "Failed to parse multipart form", parseErr)
+		models.LogErrorWithContext(ctx, "Failed to parse multipart form", parseErr)
 		return
 	}
 
@@ -47,7 +49,7 @@ func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
 
 	var channelData models.ChannelData
 	if err := json.Unmarshal([]byte(selectionJSON), &channelData); err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to unmarshal channel data", err)
+		models.LogErrorWithContext(ctx, "Failed to unmarshal channel data", err)
 		http.Error(w, "Invalid selection format", http.StatusBadRequest)
 		return
 	}
@@ -58,19 +60,19 @@ func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
 	// Convert postIDStr to an integer
 	postID, postConvErr := strconv.ParseInt(postIDStr, 10, 64)
 	if postConvErr != nil {
-		models.LogWarnWithContext(r.Context(), "Failed to convert postID: %s", postConvErr, postIDStr)
+		models.LogWarnWithContext(ctx, "Failed to convert postID: %s", postConvErr, postIDStr)
 	}
 
 	// Convert commentIDStr to an integer
 	commentID, commentConvErr := strconv.ParseInt(commentIDStr, 10, 64)
 	if commentConvErr != nil {
-		models.LogWarnWithContext(r.Context(), "Failed to convert commentID: %s", commentConvErr, commentIDStr)
+		models.LogWarnWithContext(ctx, "Failed to convert commentID: %s", commentConvErr, commentIDStr)
 	}
 
 	// Convert ChannelID to an integer
 	channelID, channelIDConvErr := strconv.ParseInt(channelData.ChannelID, 10, 64)
 	if channelIDConvErr != nil {
-		models.LogWarnWithContext(r.Context(), "Failed to convert channelID: %s", channelIDConvErr, channelData.ChannelID)
+		models.LogWarnWithContext(ctx, "Failed to convert channelID: %s", channelIDConvErr, channelData.ChannelID)
 	}
 
 	// Assign the returned values
@@ -102,10 +104,10 @@ func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("commentData.CommentedCommentID: %v\n", commentData.CommentedCommentID)
 
 	// Insert the comment
-	insertErr := h.App.Comments.Upsert(commentData)
+	insertErr := h.App.Comments.Upsert(ctx, commentData)
 
 	if insertErr != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to upsert comment", insertErr)
+		models.LogErrorWithContext(ctx, "Failed to upsert comment", insertErr)
 		http.Error(w, insertErr.Error(), 500)
 		return
 	}
@@ -116,8 +118,9 @@ func (h *CommentHandler) StoreComment(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CommentHandler) GetPostsComments(posts []*models.Post) ([]*models.Post, error) {
+	ctx := context.Background()
 	for p, post := range posts {
-		comments, err := h.App.Comments.GetCommentByPostID(post.ID)
+		comments, err := h.App.Comments.GetCommentByPostID(ctx, post.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -140,9 +143,10 @@ func (h *CommentHandler) GetPostsComments(posts []*models.Post) ([]*models.Post,
 
 // GetRepliesForComment Recursively fetches replies for each comment
 func (h *CommentHandler) GetRepliesForComment(comment models.Comment) models.Comment {
+	ctx := context.Background()
 	// Find replies to the current comment
 	var replies []models.Comment
-	comments, _ := h.App.Comments.GetCommentByCommentID(comment.ID)
+	comments, _ := h.App.Comments.GetCommentByCommentID(ctx, comment.ID)
 	comments = h.Reaction.GetCommentsLikesAndDislikes(comments)
 	for r, possibleReply := range comments {
 		models.UpdateTimeSince(&comments[r])

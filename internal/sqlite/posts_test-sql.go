@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 	"reflect"
 	"testing"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestPostModelAll(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		DB *sql.DB
 	}
@@ -25,7 +27,7 @@ func TestPostModelAll(t *testing.T) {
 			m := &PostModel{
 				DB: tt.fields.DB,
 			}
-			got, err := m.All()
+			got, err := m.All(ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("All() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -38,6 +40,7 @@ func TestPostModelAll(t *testing.T) {
 }
 
 func TestPostModelGetPostsByChannel(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		DB *sql.DB
 	}
@@ -58,7 +61,7 @@ func TestPostModelGetPostsByChannel(t *testing.T) {
 			m := &PostModel{
 				DB: tt.fields.DB,
 			}
-			got, err := m.GetPostsByChannel(tt.args.channel)
+			got, err := m.GetPostsByChannel(ctx, tt.args.channel)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetPostsByChannel() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -71,6 +74,7 @@ func TestPostModelGetPostsByChannel(t *testing.T) {
 }
 
 func TestPostModelInsert(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		DB *sql.DB
 	}
@@ -98,6 +102,7 @@ func TestPostModelInsert(t *testing.T) {
 				DB: tt.fields.DB,
 			}
 			_, err := m.Insert(
+				ctx,
 				tt.args.title,
 				tt.args.content,
 				tt.args.images,

@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/gary-norman/forum/internal/models"
@@ -10,16 +11,16 @@ type MembershipModel struct {
 	DB *sql.DB
 }
 
-func (m *MembershipModel) Insert(userID models.UUIDField, channelID int64) error {
+func (m *MembershipModel) Insert(ctx context.Context, userID models.UUIDField, channelID int64) error {
 	query := "INSERT INTO Memberships (UserID, ChannelID, Created) VALUES (?, ?, DateTime('now'))"
-	_, err := m.DB.Exec(query, userID, channelID)
+	_, err := m.DB.ExecContext(ctx, query, userID, channelID)
 	return err
 }
 
-func (m *MembershipModel) UserMemberships(userID models.UUIDField) ([]models.Membership, error) {
+func (m *MembershipModel) UserMemberships(ctx context.Context, userID models.UUIDField) ([]models.Membership, error) {
 	// fmt.Printf(ErrorMsgs.KeyValuePair, "Checking memberships for UserID", userID)
 	query := "SELECT ID, UserID, ChannelID, Created FROM Memberships WHERE UserID = ?"
-	rows, queryErr := m.DB.Query(query, userID)
+	rows, queryErr := m.DB.QueryContext(ctx, query, userID)
 	if queryErr != nil {
 		return nil, queryErr
 	}
@@ -44,9 +45,9 @@ func (m *MembershipModel) UserMemberships(userID models.UUIDField) ([]models.Mem
 	return memberships, nil
 }
 
-func (m *MembershipModel) All() ([]models.Membership, error) {
+func (m *MembershipModel) All(ctx context.Context) ([]models.Membership, error) {
 	query := "SELECT ID, UserID, ChannelID, Created FROM Memberships ORDER BY ID DESC"
-	rows, err := m.DB.Query(query)
+	rows, err := m.DB.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}

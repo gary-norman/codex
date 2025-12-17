@@ -2,10 +2,13 @@
 package view
 
 import (
+	"context"
 	"html/template"
 	"path/filepath"
 
 	"github.com/gary-norman/forum/internal/app"
+	"github.com/gary-norman/forum/internal/models"
+	"github.com/gary-norman/forum/internal/sqlite"
 )
 
 type TempHelper struct {
@@ -13,6 +16,12 @@ type TempHelper struct {
 }
 
 var Template *template.Template
+
+// reactionStatusWrapper wraps GetReactionStatus for template use
+// Templates don't have access to request context, so we use background context
+func (t *TempHelper) reactionStatusWrapper(authorID models.UUIDField, reactedPostID, reactedCommentID int64) (sqlite.ReactionStatus, error) {
+	return t.App.Reactions.GetReactionStatus(context.Background(), authorID, reactedPostID, reactedCommentID)
+}
 
 // Init Function to initialise the custom template functions
 func (t *TempHelper) Init() {
@@ -31,7 +40,7 @@ func (t *TempHelper) Init() {
 		"or":             or,
 		"printType":      printType,
 		"random":         RandomInt,
-		"reactionStatus": t.App.Reactions.GetReactionStatus,
+		"reactionStatus": t.reactionStatusWrapper,
 		"same":           checkSameName,
 		"startsWith":     startsWith,
 	}).ParseFiles(allFiles...))

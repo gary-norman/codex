@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,17 +21,18 @@ type ChannelHandler struct {
 }
 
 func (c *ChannelHandler) GetChannelPage(w http.ResponseWriter, r *http.Request) {
-	models.LogInfoWithContext(r.Context(), "GetChannelPage called")
+	ctx := r.Context()
+	models.LogInfoWithContext(ctx, "GetChannelPage called")
 	w.Header().Set("Content-Type", "application/json")
 	userLoggedIn := true
-	currentUser, ok := mw.GetUserFromContext(r.Context())
+	currentUser, ok := mw.GetUserFromContext(ctx)
 
 	if !ok {
-		models.LogWarnWithContext(r.Context(), "User not authenticated in GetChannelPage")
+		models.LogWarnWithContext(ctx, "User not authenticated in GetChannelPage")
 		userLoggedIn = false
 	}
 
-	allChannels, err := c.App.Channels.All()
+	allChannels, err := c.App.Channels.All(ctx)
 	if err != nil {
 		http.Error(w, `{"error": "Error getting all channels"}`, http.StatusInternalServerError)
 	}
@@ -48,19 +50,19 @@ func (c *ChannelHandler) GetChannelPage(w http.ResponseWriter, r *http.Request) 
 
 	if userLoggedIn {
 		// get owned and joined channels of current user
-		memberships, memberErr := c.App.Memberships.UserMemberships(currentUser.ID)
+		memberships, memberErr := c.App.Memberships.UserMemberships(ctx, currentUser.ID)
 		if memberErr != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to fetch user memberships", memberErr)
+			models.LogErrorWithContext(ctx, "Failed to fetch user memberships", memberErr)
 			http.Error(w, `{"error": "Error getting user memberships"}`, http.StatusInternalServerError)
 		}
-		ownedChannels, err = c.App.Channels.OwnedOrJoinedByCurrentUser(currentUser.ID)
+		ownedChannels, err = c.App.Channels.OwnedOrJoinedByCurrentUser(ctx, currentUser.ID)
 		if err != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to fetch user owned channels", err)
+			models.LogErrorWithContext(ctx, "Failed to fetch user owned channels", err)
 			http.Error(w, `{"error": "Error getting user owned channels"}`, http.StatusInternalServerError)
 		}
 		joinedChannels, err = c.JoinedByCurrentUser(memberships)
 		if err != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to fetch user joined channels", err)
+			models.LogErrorWithContext(ctx, "Failed to fetch user joined channels", err)
 			http.Error(w, `{"error": "Error getting user joined channels"}`, http.StatusInternalServerError)
 		}
 		ownedAndJoinedChannels = append(ownedChannels, joinedChannels...)
@@ -80,45 +82,46 @@ func (c *ChannelHandler) GetChannelPage(w http.ResponseWriter, r *http.Request) 
 }
 
 func (c *ChannelHandler) GetThisChannel(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	w.Header().Set("Content-Type", "application/json")
-	models.LogInfoWithContext(r.Context(), "GetThisChannel called")
+	models.LogInfoWithContext(ctx, "GetThisChannel called")
 	userLoggedIn := true
-	currentUser, ok := mw.GetUserFromContext(r.Context())
+	currentUser, ok := mw.GetUserFromContext(ctx)
 	if !ok {
-		models.LogWarnWithContext(r.Context(), "User not authenticated in GetThisChannel")
+		models.LogWarnWithContext(ctx, "User not authenticated in GetThisChannel")
 		userLoggedIn = false
 	}
 
 	// Parse channelID from the request
 	channelID, err := models.GetIntFromPathValue(r.PathValue("channelId"))
 	if err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to parse channel ID from path value", err)
+		models.LogErrorWithContext(ctx, "Failed to parse channel ID from path value", err)
 		error := fmt.Errorf("channel not found: %s: %w", r.PathValue("channelId"), err)
 		view.RenderErrorPage(w, models.NotFoundLocation("channel"), 400, error)
 		return
 	}
 
 	// Fetch the channel
-	foundChannels, err := c.App.Channels.GetChannelsByID(channelID)
+	foundChannels, err := c.App.Channels.GetChannelsByID(ctx, channelID)
 	if err != nil || len(foundChannels) == 0 {
-		models.LogErrorWithContext(r.Context(), "Channel not found by ID", err)
+		models.LogErrorWithContext(ctx, "Channel not found by ID", err)
 		error := fmt.Errorf("channel %d not found: %w", channelID, err)
 		view.RenderErrorPage(w, models.NotFoundLocation("channel"), 400, error)
 		return
 	}
 	thisChannel := foundChannels[0]
-	models.LogInfoWithContext(r.Context(), "Fetching channel: %s", thisChannel.Name)
+	models.LogInfoWithContext(ctx, "Fetching channel: %s", thisChannel.Name)
 	models.UpdateTimeSince(thisChannel)
 
 	// Fetch the channel owner
-	thisChannelOwnerName, ownerErr := c.App.Users.GetSingleUserValue(thisChannel.OwnerID, "ID", "username")
+	thisChannelOwnerName, ownerErr := c.App.Users.GetSingleUserValue(ctx, thisChannel.OwnerID, "ID", "username")
 	if ownerErr != nil {
 		http.Error(w, `{"error": "Error getting channel owner"}`, http.StatusInternalServerError)
 		return
 	}
 
 	// Fetch channel rules
-	thisChannelRules, err := c.App.Rules.AllForChannel(thisChannel.ID)
+	thisChannelRules, err := c.App.Rules.AllForChannel(ctx, thisChannel.ID)
 	if err != nil {
 		http.Error(w, `{"error": "Error getting channel rules"}`, http.StatusInternalServerError)
 		return
@@ -126,26 +129,26 @@ func (c *ChannelHandler) GetThisChannel(w http.ResponseWriter, r *http.Request) 
 
 	// Fetch channel posts
 	var thisChannelPosts []*models.Post
-	thisChannelPostIDs, err := c.App.Channels.GetPostIDsFromChannel(thisChannel.ID)
+	thisChannelPostIDs, err := c.App.Channels.GetPostIDsFromChannel(ctx, thisChannel.ID)
 	if err != nil {
 		http.Error(w, `{"error": "Error getting Post IDs"}`, http.StatusInternalServerError)
 	}
 	for p := range thisChannelPostIDs {
-		post, err := c.App.Posts.GetPostByID(thisChannelPostIDs[p])
+		post, err := c.App.Posts.GetPostByID(ctx, thisChannelPostIDs[p])
 		if err != nil {
 			http.Error(w, `{"error": "Error getting post ID:" + thisChannelPostIDs[p]}`, http.StatusInternalServerError)
 		}
 		thisChannelPosts = append(thisChannelPosts, &post)
 	}
 
-	allChannels, err := c.App.Channels.All()
+	allChannels, err := c.App.Channels.All(ctx)
 	if err != nil {
 		http.Error(w, `{"error": "Error getting all channels"}`, http.StatusInternalServerError)
 	}
 	for c := range allChannels {
 		models.UpdateTimeSince(allChannels[c])
 	}
-	channelName, err := c.App.Channels.GetChannelNameFromID(thisChannel.ID)
+	channelName, err := c.App.Channels.GetChannelNameFromID(ctx, thisChannel.ID)
 	if err != nil {
 		http.Error(w, `{"error": "error fetching channel name"}`, http.StatusInternalServerError)
 	}
@@ -181,25 +184,25 @@ func (c *ChannelHandler) GetThisChannel(w http.ResponseWriter, r *http.Request) 
 	if userLoggedIn {
 		isOwned = currentUser.ID == thisChannel.OwnerID
 		// attach following/follower numbers to currently logged-in user
-		currentUser.Followers, currentUser.Following, err = c.App.Loyalty.CountUsers(currentUser.ID)
+		currentUser.Followers, currentUser.Following, err = c.App.Loyalty.CountUsers(ctx, currentUser.ID)
 		if err != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to count current user loyalty", err)
+			models.LogErrorWithContext(ctx, "Failed to count current user loyalty", err)
 			http.Error(w, `{"error": "Error getting user loyalty"}`, http.StatusInternalServerError)
 		}
 		// get owned and joined channels of current user
-		memberships, memberErr := c.App.Memberships.UserMemberships(currentUser.ID)
+		memberships, memberErr := c.App.Memberships.UserMemberships(ctx, currentUser.ID)
 		if memberErr != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to fetch user memberships", memberErr)
+			models.LogErrorWithContext(ctx, "Failed to fetch user memberships", memberErr)
 			http.Error(w, `{"error": "Error getting user memberships"}`, http.StatusInternalServerError)
 		}
-		ownedChannels, err = c.App.Channels.OwnedOrJoinedByCurrentUser(currentUser.ID)
+		ownedChannels, err = c.App.Channels.OwnedOrJoinedByCurrentUser(ctx, currentUser.ID)
 		if err != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to fetch user owned channels", err)
+			models.LogErrorWithContext(ctx, "Failed to fetch user owned channels", err)
 			http.Error(w, `{"error": "Error getting user owned channels"}`, http.StatusInternalServerError)
 		}
 		joinedChannels, err = c.JoinedByCurrentUser(memberships)
 		if err != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to fetch user joined channels", err)
+			models.LogErrorWithContext(ctx, "Failed to fetch user joined channels", err)
 			http.Error(w, `{"error": "Error getting user joined channels"}`, http.StatusInternalServerError)
 		}
 		ownedAndJoinedChannels = append(ownedChannels, joinedChannels...)
@@ -232,12 +235,13 @@ func (c *ChannelHandler) GetThisChannel(w http.ResponseWriter, r *http.Request) 
 }
 
 func (c *ChannelHandler) GetChannelInfoFromPostID(postID int64) (int64, string, error) {
-	channelIDs, err := c.App.Channels.GetChannelIDFromPost(postID)
+	ctx := context.Background()
+	channelIDs, err := c.App.Channels.GetChannelIDFromPost(ctx, postID)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to get channel ID from post %d: %w", postID, err)
 	}
 	channelID := channelIDs[0]
-	channelName, err := c.App.Channels.GetChannelNameFromID(channelID)
+	channelName, err := c.App.Channels.GetChannelNameFromID(ctx, channelID)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to get channel name from ID %d: %w", channelID, err)
 	}
@@ -245,14 +249,15 @@ func (c *ChannelHandler) GetChannelInfoFromPostID(postID int64) (int64, string, 
 }
 
 func (c *ChannelHandler) StoreChannel(w http.ResponseWriter, r *http.Request) {
-	user, ok := mw.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user, ok := mw.GetUserFromContext(ctx)
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 	parseErr := r.ParseMultipartForm(10 << 20)
 	if parseErr != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to parse multipart form in StoreChannel", parseErr)
+		models.LogErrorWithContext(ctx, "Failed to parse multipart form in StoreChannel", parseErr)
 		http.Error(w, parseErr.Error(), 400)
 		return
 	}
@@ -273,6 +278,7 @@ func (c *ChannelHandler) StoreChannel(w http.ResponseWriter, r *http.Request) {
 	createChannelData.Avatar = GetFileName(r, "file-drop", "storeChannel", "channel")
 
 	insertErr := c.App.Channels.Insert(
+		ctx,
 		createChannelData.OwnerID,
 		createChannelData.Name,
 		createChannelData.Description,
@@ -284,7 +290,7 @@ func (c *ChannelHandler) StoreChannel(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if insertErr != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to insert channel", insertErr)
+		models.LogErrorWithContext(ctx, "Failed to insert channel", insertErr)
 		http.Error(w, insertErr.Error(), 500)
 		return
 	}
@@ -293,31 +299,32 @@ func (c *ChannelHandler) StoreChannel(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ChannelHandler) StoreMembership(w http.ResponseWriter, r *http.Request) {
-	user, ok := mw.GetUserFromContext(r.Context())
+	ctx := r.Context()
+	user, ok := mw.GetUserFromContext(ctx)
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 	if parseErr := r.ParseForm(); parseErr != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to parse form in StoreMembership", parseErr)
+		models.LogErrorWithContext(ctx, "Failed to parse form in StoreMembership", parseErr)
 		http.Error(w, parseErr.Error(), 400)
 		return
 	}
-	models.LogInfoWithContext(r.Context(), "User %s joining channel", user.Username)
+	models.LogInfoWithContext(ctx, "User %s joining channel", user.Username)
 	// get channelID
 	joinedChannelID, convErr := strconv.ParseInt(r.PostForm.Get("channelId"), 10, 64)
 	if convErr != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to convert channelId to int", convErr)
+		models.LogErrorWithContext(ctx, "Failed to convert channelId to int", convErr)
 	}
-	if err := c.App.Memberships.Insert(user.ID, joinedChannelID); err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to insert membership", err)
+	if err := c.App.Memberships.Insert(ctx, user.ID, joinedChannelID); err != nil {
+		models.LogErrorWithContext(ctx, "Failed to insert membership", err)
 		http.Error(w, err.Error(), 500)
 		return
 	}
 
-	channelName, err := c.App.Channels.GetNameOfChannel(joinedChannelID)
+	channelName, err := c.App.Channels.GetNameOfChannel(ctx, joinedChannelID)
 	if err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to get channel name", err)
+		models.LogErrorWithContext(ctx, "Failed to get channel name", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -327,7 +334,7 @@ func (c *ChannelHandler) StoreMembership(w http.ResponseWriter, r *http.Request)
 		"message": fmt.Sprintf("Welcome to %v!", channelName),
 	})
 	if encErr != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to encode response in StoreMembership", encErr)
+		models.LogErrorWithContext(ctx, "Failed to encode response in StoreMembership", encErr)
 		return
 	}
 }
@@ -336,10 +343,11 @@ func (c *ChannelHandler) StoreMembership(w http.ResponseWriter, r *http.Request)
 
 // JoinedByCurrentUser checks if the currently logged-in user is a member of the current channel
 func (c *ChannelHandler) JoinedByCurrentUser(memberships []models.Membership) ([]*models.Channel, error) {
+	ctx := context.Background()
 	models.LogInfo("Checking user memberships")
 	var channels []*models.Channel
 	for _, membership := range memberships {
-		channel, err := c.App.Channels.GetChannelsByID(membership.ChannelID)
+		channel, err := c.App.Channels.GetChannelsByID(ctx, membership.ChannelID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get channel %d for membership: %w", membership.ChannelID, err)
 		}
@@ -355,15 +363,16 @@ func (c *ChannelHandler) JoinedByCurrentUser(memberships []models.Membership) ([
 }
 
 func (c *ChannelHandler) CreateAndInsertRule(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	channelID, err := strconv.ParseInt(r.PathValue("channelId"), 10, 64)
 	if err != nil {
-		models.LogErrorWithContext(r.Context(), "Failed to convert channelId to int", err)
+		models.LogErrorWithContext(ctx, "Failed to convert channelId to int", err)
 	}
 
 	// Get the "rules" input value
 	rulesJSON := r.FormValue("rules")
 	if rulesJSON == "" { // TODO send this message to the user
-		models.LogWarnWithContext(r.Context(), "No rules added or removed by user")
+		models.LogWarnWithContext(ctx, "No rules added or removed by user")
 	}
 
 	// Decode JSON into a slice of Rule structs
@@ -377,21 +386,21 @@ func (c *ChannelHandler) CreateAndInsertRule(w http.ResponseWriter, r *http.Requ
 		id, found := strings.CutPrefix(rule.ID, "existing-channel-rule-")
 		idInt, err := strconv.ParseInt(id, 10, 64)
 		if err != nil {
-			models.LogErrorWithContext(r.Context(), "Failed to convert rule ID to int", err)
+			models.LogErrorWithContext(ctx, "Failed to convert rule ID to int", err)
 		}
 		if found {
-			err := c.App.Rules.DeleteRule(channelID, idInt)
+			err := c.App.Rules.DeleteRule(ctx, channelID, idInt)
 			if err != nil {
-				models.LogErrorWithContext(r.Context(), "Failed to delete rule", err)
+				models.LogErrorWithContext(ctx, "Failed to delete rule", err)
 			}
 		} else {
-			ruleID, err := c.App.Rules.CreateRule(rule.Rule)
+			ruleID, err := c.App.Rules.CreateRule(ctx, rule.Rule)
 			if err != nil {
-				models.LogErrorWithContext(r.Context(), "Failed to create rule", err)
+				models.LogErrorWithContext(ctx, "Failed to create rule", err)
 			}
-			err = c.App.Rules.InsertRule(channelID, ruleID)
+			err = c.App.Rules.InsertRule(ctx, channelID, ruleID)
 			if err != nil {
-				models.LogErrorWithContext(r.Context(), "Failed to insert rule", err)
+				models.LogErrorWithContext(ctx, "Failed to insert rule", err)
 			}
 		}
 	}

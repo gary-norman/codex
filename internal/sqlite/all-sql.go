@@ -4,7 +4,6 @@ import (
 	"database/sql"
 
 	"github.com/gary-norman/forum/internal/colors"
-	"github.com/gary-norman/forum/internal/models"
 )
 
 type AllModel struct {
@@ -13,5 +12,4 @@ type AllModel struct {
 
 var (
 	Colors, _ = colors.UseFlavor("Mocha")
-	ErrorMsgs = models.CreateErrorMessages()
 )

@@ -9,15 +9,22 @@ import (
 	"github.com/gary-norman/forum/internal/models"
 )
 
-var ErrAuth = errors.New("not authenticated")
-
 type SessionHandler struct {
 	App *app.App
 }
 
+var (
+	authUser                       string = "✘ Failed!"
+	authUserColor                         = Colors.Red
+	stColor, csrfColor                    = Colors.Red, Colors.Red
+	stMatchString, csrfMatchString        = "✘ Failed!", "✘ Failed!"
+	successFail                           = fmt.Sprintf("Authorise user %s%s%s for user: ", authUserColor, authUser, Colors.Reset)
+)
+
 func (s *SessionHandler) IsAuthenticated(r *http.Request, username string) error {
+	ctx := r.Context()
 	var user *models.User
-	user, getUserErr := s.App.Users.GetUserByUsername(username, "isAuthenticated")
+	user, getUserErr := s.App.Users.GetUserByUsername(ctx, username, "isAuthenticated")
 	if getUserErr != nil {
 		return fmt.Errorf(ErrorMsgs.NotFound, username, "isAuthenticated", getUserErr)
 	}
@@ -30,7 +37,7 @@ func (s *SessionHandler) IsAuthenticated(r *http.Request, username string) error
 		// fmt.Printf(ErrorMsgs.KeyValuePair, "Cookie SessionToken", st.Value)
 		// fmt.Printf(ErrorMsgs.KeyValuePair, "Error", err)
 		// fmt.Printf(ErrorMsgs.KeyValuePair, "User SessionToken", user.SessionToken)
-		return ErrAuth
+		return fmt.Errorf("authentication failed: %w", err)
 	}
 	// csrf, _ := r.Cookie("csrf_token")
 
@@ -38,21 +45,12 @@ func (s *SessionHandler) IsAuthenticated(r *http.Request, username string) error
 	csrfToken := r.Header.Get("x-csrf-token")
 	// fmt.Printf(ErrorMsgs.KeyValuePair, "Header", r.Header)
 	if csrfToken == "" || csrfToken != user.CSRFToken {
-		// fmt.Printf(ErrorMsgs.KeyValuePair, "Cookie csrfToken", csrf.Value)
-		// fmt.Printf(ErrorMsgs.KeyValuePair, "Header csrfToken", csrfToken)
-		// fmt.Printf(ErrorMsgs.KeyValuePair, "User csrfToken", user.CSRFToken)
-		// fmt.Printf(ErrorMsgs.Divider)
-		fmt.Println(Colors.Blue + "Authorise user: " + Colors.Red + "Failed!\n" + Colors.Reset)
-		return ErrAuth
+		authErr := fmt.Errorf("%s%s", successFail, user.Username)
+		models.LogErrorWithContext(ctx, "CSRF token mismatch for user: %s", authErr, user.Username)
+		return authErr
 	}
-	// fmt.Printf(ErrorMsgs.KeyValuePair, "Cookie SessionToken", st.Value)
-	// fmt.Printf(ErrorMsgs.KeyValuePair, "Error", err)
-	// fmt.Printf(ErrorMsgs.KeyValuePair, "User SessionToken", user.SessionToken)
-	// fmt.Printf(ErrorMsgs.Divider)
-	// fmt.Printf(ErrorMsgs.KeyValuePair, "Cookie csrfToken", csrf.Value)
-	// fmt.Printf(ErrorMsgs.KeyValuePair, "Header csrfToken", csrfToken)
-	// fmt.Printf(ErrorMsgs.KeyValuePair, "User csrfToken", user.CSRFToken)
-	// fmt.Printf(ErrorMsgs.Divider)
-	fmt.Println(Colors.Blue + "Authorise user: " + Colors.Green + "Success!" + Colors.Reset)
+	authUser = "✔ Success!"
+	authUserColor = Colors.Green
+	models.LogInfoWithContext(ctx, "CSRF token match for user: %s", successFail, user.Username)
 	return nil
 }

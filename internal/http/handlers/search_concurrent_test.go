@@ -70,9 +70,9 @@ func TestConcurrentSearch(t *testing.T) {
 
 		// Run sequential search
 		sequentialStart := time.Now()
-		appInstance.Users.All()
-		appInstance.Posts.All()
-		appInstance.Channels.All()
+		appInstance.Users.All(ctx)
+		appInstance.Posts.All(ctx)
+		appInstance.Channels.All(ctx)
 		sequentialDuration := time.Since(sequentialStart)
 
 		t.Logf("Concurrent: %v", concurrentDuration)
@@ -98,18 +98,19 @@ func TestConcurrentSearch(t *testing.T) {
 }
 
 func TestEnrichPostsWithChannels(t *testing.T) {
+	ctx := context.Background()
 	appInstance, cleanup, err := app.InitializeApp()
 	if err != nil {
 		t.Fatalf("Failed to initialize app: %v", err)
 	}
 	defer cleanup()
 
-	posts, err := appInstance.Posts.All()
+	posts, err := appInstance.Posts.All(ctx)
 	if err != nil {
 		t.Fatalf("Failed to get posts: %v", err)
 	}
 
-	channels, err := appInstance.Channels.All()
+	channels, err := appInstance.Channels.All(ctx)
 	if err != nil {
 		t.Fatalf("Failed to get channels: %v", err)
 	}
@@ -146,6 +147,7 @@ func BenchmarkConcurrentSearch(b *testing.B) {
 }
 
 func BenchmarkSequentialSearch(b *testing.B) {
+	ctx := context.Background()
 	appInstance, cleanup, err := app.InitializeApp()
 	if err != nil {
 		b.Fatalf("Failed to initialize app: %v", err)
@@ -154,8 +156,8 @@ func BenchmarkSequentialSearch(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		appInstance.Users.All()
-		appInstance.Posts.All()
-		appInstance.Channels.All()
+		appInstance.Users.All(ctx)
+		appInstance.Posts.All(ctx)
+		appInstance.Channels.All(ctx)
 	}
 }

@@ -1,8 +1,9 @@
 package sqlite
 
 import (
+	"context"
 	"database/sql"
-	"log"
+	"fmt"
 
 	"github.com/gary-norman/forum/internal/models"
 )
@@ -11,24 +12,60 @@ type SavedModel struct {
 	DB *sql.DB
 }
 
-func (m *SavedModel) Insert(postID, commentID, channelID int64) error {
+func (m *SavedModel) Insert(ctx context.Context, postID, commentID, channelID int64) error {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction for Insert in SavedModel: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarn("Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	stmt := "INSERT INTO Bookmarks (PostID, CommentID, ChannelID, Created) VALUES (?, ?, ?, DateTime('now'))"
-	_, err := m.DB.Exec(stmt, postID, commentID, channelID)
-	return err
+	if _, err = tx.ExecContext(ctx, stmt, postID, commentID, channelID); err != nil {
+		return fmt.Errorf("failed to execute statement for Insert in SavedModel: %w", err)
+	}
+
+	// Commit the transaction
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction for Insert in SavedModel: %w", err)
+	}
+
+	return nil
 }
 
-func (m *SavedModel) All() ([]models.Bookmark, error) {
+func (m *SavedModel) All(ctx context.Context) ([]models.Bookmark, error) {
+	// Begin the transaction
+	tx, err := m.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction for All in SavedModel: %w", err)
+	}
+
+	// Ensure rollback on failure
+	defer func() {
+		if p := recover(); p != nil {
+			models.LogWarn("Panic occurred, rolling back transaction: %v", p)
+			_ = tx.Rollback()
+			panic(p)
+		} else if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
 	stmt := "SELECT ID, PostID, CommentID, ChannelID, Created FROM Bookmarks ORDER BY ID DESC"
-	rows, err := m.DB.Query(stmt)
+	rows, err := tx.QueryContext(ctx, stmt)
 	if err != nil {
 		return nil, err
 	}
-
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil {
-			log.Printf(ErrorMsgs.Close, rows, "All", closeErr)
-		}
-	}()
 
 	var Bookmarks []models.Bookmark
 	for rows.Next() {
@@ -42,6 +79,11 @@ func (m *SavedModel) All() ([]models.Bookmark, error) {
 
 	if err = rows.Err(); err != nil {
 		return nil, err
+	}
+
+	// Commit the transaction
+	if err = tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction for All in SavedModel: %w", err)
 	}
 
 	return Bookmarks, nil
