@@ -12,7 +12,7 @@ type ChatModel struct {
 	DB *sql.DB
 }
 
-func (c *ChatModel) CreateChat(ctx context.Context, chatType, name string, groupID, buddyID models.UUIDField) (models.UUIDField, error) {
+func (c *ChatModel) CreateChat(ctx context.Context, chatType, name string, groupID, buddyID models.NullableUUIDField) (models.UUIDField, error) {
 	chatID := models.NewUUIDField()
 	query := "INSERT INTO Chats (ID, Type, Name, GroupID, BuddyID, Created) VALUES (?, ?, ?, ?, ?, DateTime('now'))"
 	_, err := c.DB.ExecContext(ctx, query, chatID, chatType, name, groupID, buddyID)
@@ -116,24 +116,6 @@ func (c *ChatModel) GetChat(ctx context.Context, chatID models.UUIDField) (*mode
 
 // GetUserChats retrieves all chats for a specific user
 func (c *ChatModel) GetUserChats(ctx context.Context, userID models.UUIDField) ([]models.Chat, error) {
-	// Begin the transaction
-	tx, err := c.DB.BeginTx(ctx, nil)
-	// fmt.Println("Beginning UPDATE transaction")
-	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction for GetUserChats: %w", err)
-	}
-
-	// Ensure rollback on failure
-	defer func() {
-		if p := recover(); p != nil {
-			models.LogWarnWithContext(ctx, "Panic occurred, rolling back transaction: %v", p)
-			_ = tx.Rollback()
-			panic(p)
-		} else if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
 	query := `
 		SELECT c.ID, c.Type, c.Name, c.Created, c.LastActive, c.GroupID, c.BuddyID
 		FROM Chats c
@@ -142,7 +124,7 @@ func (c *ChatModel) GetUserChats(ctx context.Context, userID models.UUIDField) (
 		ORDER BY c.LastActive DESC
 	`
 
-	rows, err := tx.QueryContext(ctx, query, userID)
+	rows, err := c.DB.QueryContext(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query user chats: %w", err)
 	}
@@ -166,12 +148,6 @@ func (c *ChatModel) GetUserChats(ctx context.Context, userID models.UUIDField) (
 		}
 
 		chats = append(chats, chat)
-	}
-
-	// Commit the transaction
-	commitErr := tx.Commit()
-	if commitErr != nil {
-		return nil, fmt.Errorf("failed to commit transaction for GetUserChats: %w", commitErr)
 	}
 
 	return chats, nil
@@ -284,4 +260,60 @@ func (c *ChatModel) GetChatMessages(ctx context.Context, chatID models.UUIDField
 	}
 
 	return messages, nil
+}
+
+// GetChatParticipantIDs returns all user IDs that are participants in the given chat
+func (c *ChatModel) GetChatParticipantIDs(ctx context.Context, chatID models.UUIDField) ([]models.UUIDField, error) {
+	query := `SELECT UserID FROM ChatUsers WHERE ChatID = ?`
+	rows, err := c.DB.QueryContext(ctx, query, chatID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query chat participants: %w", err)
+	}
+	defer rows.Close()
+
+	var participantIDs []models.UUIDField
+	for rows.Next() {
+		var userID models.UUIDField
+		if err := rows.Scan(&userID); err != nil {
+			return nil, fmt.Errorf("failed to scan participant ID: %w", err)
+		}
+		participantIDs = append(participantIDs, userID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating chat participants: %w", err)
+	}
+
+	return participantIDs, nil
+}
+
+// IsUserInChat checks if a user is a participant in the given chat
+func (c *ChatModel) IsUserInChat(ctx context.Context, chatID, userID models.UUIDField) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM ChatUsers WHERE ChatID = ? AND UserID = ?)`
+	var exists bool
+	err := c.DB.QueryRowContext(ctx, query, chatID, userID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if user is in chat: %w", err)
+	}
+	return exists, nil
+}
+
+// GetBuddyChatID returns the chat ID if a buddy chat exists between two users
+func (c *ChatModel) GetBuddyChatID(ctx context.Context, user1ID, user2ID models.UUIDField) (models.UUIDField, error) {
+	query := `
+		SELECT DISTINCT c.ID
+		FROM Chats c
+		INNER JOIN ChatUsers cu1 ON c.ID = cu1.ChatID
+		INNER JOIN ChatUsers cu2 ON c.ID = cu2.ChatID
+		WHERE c.Type = 'buddy'
+		AND cu1.UserID = ?
+		AND cu2.UserID = ?
+		LIMIT 1
+	`
+	var chatID models.UUIDField
+	err := c.DB.QueryRowContext(ctx, query, user1ID, user2ID).Scan(&chatID)
+	if err != nil {
+		return models.ZeroUUIDField(), fmt.Errorf("failed to find buddy chat: %w", err)
+	}
+	return chatID, nil
 }

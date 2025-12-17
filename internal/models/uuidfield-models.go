@@ -111,21 +111,17 @@ func UUIDFieldFromString(s string) (UUIDField, error) {
 
 // Scan implements the sql.Scanner interface.
 func (u *NullableUUIDField) Scan(value any) error {
-	switch v := value.(type) {
-	case nil:
+	if value == nil {
 		u.Valid = false
 		return nil
-	case []byte:
-		parsed, err := uuid.ParseBytes(v)
-		if err != nil {
-			return err
-		}
-		u.UUID = UUIDField{UUID: parsed}
-		u.Valid = true
-		return nil
-	default:
-		return fmt.Errorf("NullableUUIDField: cannot scan type %T", v)
 	}
+	// Use UUIDField's Scan method for non-nil values
+	err := u.UUID.Scan(value)
+	if err != nil {
+		return err
+	}
+	u.Valid = true
+	return nil
 }
 
 // Value implements the driver.Valuer interface.
