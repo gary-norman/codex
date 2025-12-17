@@ -77,6 +77,9 @@ EOF
 
 printf "${GREEN}✓ configuration saved to ${CODEX_PINK}.env${NC}\n"
 printf "${CODEX_PINK}---------------------------------------------${NC}\n"
-
-printf "${YELLOW}⚠${CODEX_GREEN} configuration reset${NC} — run ${CODEX_PINK}'make configure'${NC} to set new values\n"
-printf "${GREEN}✓${CODEX_GREEN} DB_ENV set to ${CODEX_PINK}%s${NC}\n" "$DB_PATH"
+printf "${CODEX_GREEN}Configuration Summary:${NC}\n"
+printf "${CODEX_GREEN}  Database: ${CODEX_PINK}%s${NC} (${CODEX_PINK}%s${NC})\n" "$DB_ENV" "$DB_PATH"
+printf "${CODEX_GREEN}  Image: ${CODEX_PINK}%s${NC}\n" "$IMAGE"
+printf "${CODEX_GREEN}  Container: ${CODEX_PINK}%s${NC}\n" "$CONTAINER"
+printf "${CODEX_GREEN}  Port: ${CODEX_PINK}%s${NC}\n" "$PORT"
+printf "${CODEX_PINK}---------------------------------------------${NC}\n"
