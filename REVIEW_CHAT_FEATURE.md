@@ -357,12 +357,12 @@ git log --oneline -5
 
 ### Step 2: Create Pull Request
 
-**Via GitHub Web Interface**:
+**Via Gitea Web Interface**:
 
 1. Navigate to: https://learn.01founders.co/git/gnorman/forum
 2. You should see a banner: "ws/main had recent pushes"
 3. Click "Compare & pull request" (or "New pull request")
-4. Set **base**: `main` ← **compare**: `ws/main`
+4. Set **merge into**: `main` ← **pull from**: `ws/main`
 5. **Title**: "Chat Creation Feature - User-to-User Messaging UI"
 6. **Description**: (paste below)
 
