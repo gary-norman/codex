@@ -212,14 +212,16 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fakeChatID_1 := models.NewUUIDField()
-	fakeChatID_2 := models.NewUUIDField()
-	fakeUser_1 := allUsers[1]
-	fakeUser_2 := allUsers[2]
-	fakeUser_3 := allUsers[3]
-	fakeUser_4 := allUsers[4]
+	// Only add fake demo chats if there are enough users (for testing/demo purposes)
+	if len(allUsers) >= 5 {
+		fakeChatID_1 := models.NewUUIDField()
+		fakeChatID_2 := models.NewUUIDField()
+		fakeUser_1 := allUsers[1]
+		fakeUser_2 := allUsers[2]
+		fakeUser_3 := allUsers[3]
+		fakeUser_4 := allUsers[4]
 
-	chats = append(chats, models.Chat{
+		chats = append(chats, models.Chat{
 		ID:         fakeChatID_1,
 		ChatType:   "buddy",
 		Name:       "chat logic",
@@ -280,6 +282,7 @@ func (h *HomeHandler) RenderIndex(w http.ResponseWriter, r *http.Request) {
 			{ChatID: fakeChatID_2, Sender: fakeUser_2, Content: "I think we can all agree this conversation needs better type definitions.", Created: time.Now().Add(-15 * time.Second)},
 		},
 	})
+	}
 
 	// SECTION -- template ---
 	data := models.TemplateData{

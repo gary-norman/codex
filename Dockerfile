@@ -47,8 +47,7 @@ COPY --from=builder /app/bin/codex /app/bin/codex
 COPY --from=builder /app/migrations /app/migrations
 COPY --from=builder /app/assets /app/assets
 COPY --from=builder /app/robots.txt /app/robots.txt
-COPY --from=builder /app/default-images/donkey.png /app/db/userdata/images/user-images/donkey.png
-COPY --from=builder /app/default-images/codex.png /app/db/userdata/images/channel-images/codex.png
+COPY --from=builder /app/default-images /app/default-images
 COPY --from=builder /app/.env /app/.env
 
 # Copy entrypoint (already fixed with dos2unix in builder stage)
