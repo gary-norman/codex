@@ -78,7 +78,8 @@ make verify-scripts
 
 - **`internal/sqlite/`** - SQLite-specific implementations for each model
   - `*-sql.go` files contain model-specific queries
-  - Models: Users, Posts, Comments, Reactions, Channels, Memberships, Cookies, Flags, Loyalty, Saved, Mods, Rules, Images, MutedChannels
+  - Models: Users, Posts, Comments, Reactions, Channels, Memberships, Cookies, Flags, Loyalty, Saved, Mods, Rules, Images, MutedChannels, Chats
+  - `chats-sql.go` - Chat and message storage with buddy/group chat support
 
 - **`internal/models/`** - Data models and business logic
   - `*-models.go` files define structs with `db` tags for column mapping
@@ -93,12 +94,16 @@ make verify-scripts
   - Follows repository pattern for testability
 
 - **`internal/http/`**
-  - `handlers/` - HTTP request handlers for auth, posts, comments, channels, users, search, reactions, moderation
+  - `handlers/` - HTTP request handlers for auth, posts, comments, channels, users, search, reactions, moderation, chats
+    - `chat-handlers.go` - Chat creation and management endpoints
   - `middleware/` - Authentication, context injection, logging, timeout protection
     - `timeout.go` - Request timeout middleware with context cancellation
   - `routes/` - Router setup and handler dependency injection
     - `registry.go` - Dependency injection for handlers (important!)
     - `routes.go` - Route definitions using Go 1.22+ enhanced servemux
+  - `websocket/` - WebSocket server for real-time messaging
+    - Connection management with user identification via OTP
+    - Chat message broadcasting to participants
 
 - **`internal/workers/`** - Background job processing
   - `image_worker.go` - Concurrent image processing worker pool
@@ -143,6 +148,7 @@ Codex uses a custom UUIDField type for user identification throughout the applic
 - **Storage**: UUIDs stored as 16-byte BLOBs in SQLite for efficiency (not strings)
 - **JSON Support**: Implements `MarshalJSON`/`UnmarshalJSON` for API responses
 - **No Manual Conversion**: The `Value()` method automatically converts to `[]byte` for database operations
+- **Nullable Support**: `NullableUUIDField` provides SQL NULL handling with `Valid` flag
 
 **Location**: `internal/models/uuidfield-models.go`
 
@@ -155,6 +161,10 @@ userID := models.NewUUIDField()
 db.Exec("INSERT INTO Users (ID) VALUES (?)", userID)
 
 // The UUIDField.Value() method handles conversion automatically
+
+// Nullable UUID for optional foreign keys
+groupID := models.NullableUUIDField{Valid: false} // SQL NULL
+buddyID := models.NullableUUIDField{UUID: userID, Valid: true} // Has value
 ```
 
 **Concurrent Image Processing Worker Pool**
@@ -189,6 +199,29 @@ if err := pool.Submit(job); err != nil {
 ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 defer cancel()
 pool.Shutdown(ctx)
+```
+
+**Real-Time Chat System**
+WebSocket-based chat with buddy and group messaging:
+- **Chat Types**: Buddy chats (1-on-1) and group chats with CHECK constraints ensuring data integrity
+- **User Identification**: WebSocket connections authenticated via one-time passwords (OTP)
+- **Idempotent Creation**: `GetBuddyChatID()` prevents duplicate chats between users
+- **Database Design**: Uses `NullableUUIDField` to enforce mutual exclusivity (buddy chats have NULL GroupID, group chats have NULL BuddyID)
+- **Frontend Integration**: `chat.js` handles form submission via WebSocket, `setupStartChatHandlers()` creates new chats
+- **API Endpoint**: `POST /api/chats/create` creates or retrieves existing chat, returns chat ID
+
+**Location**: `internal/http/handlers/chat-handlers.go`, `internal/sqlite/chats-sql.go`, `assets/js/chat.js`
+
+**Example Flow**:
+```go
+// Create buddy chat (groupID = NULL, buddyID = user UUID)
+chatID, err := h.App.Chats.CreateChat(ctx, "buddy", "",
+    models.NullableUUIDField{Valid: false},              // groupID = NULL
+    models.NullableUUIDField{UUID: buddyUUID, Valid: true}) // buddyID = value
+
+// Attach users to chat
+h.App.Chats.AttachUserToChat(ctx, chatID, currentUserID)
+h.App.Chats.AttachUserToChat(ctx, chatID, buddyID)
 ```
 
 **Dependency Injection via Handler Registry**
