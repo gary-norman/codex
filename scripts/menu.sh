@@ -187,8 +187,8 @@ docker_menu() {
 
 # Docker Compose submenu
 compose_menu() {
-  local compose_options=("back" "compose-up" "compose-down" "compose-restart" "compose-logs" "compose-ps" "compose-build")
-  local compose_descs=("return to main menu" "start services (detached)" "stop and remove services" "restart services" "view service logs" "show service status" "build services")
+  local compose_options=("back" "compose-up" "compose-down" "compose-restart" "compose-logs" "compose-ps" "compose-build" "compose-edit")
+  local compose_descs=("return to main menu" "start services (detached)" "stop and remove services" "restart services" "view service logs" "show service status" "build services" "edit docker-compose.yml")
 
   while true; do
     show_menu "Docker Compose Commands" compose_options compose_descs
