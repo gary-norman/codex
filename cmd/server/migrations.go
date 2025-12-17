@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gary-norman/forum/internal/colors"
@@ -14,6 +15,11 @@ import (
 var (
 	migrationColors, _ = colors.UseFlavor("Mocha")
 )
+
+// isDuplicateColumnError checks if error is due to duplicate column (safe to ignore)
+func isDuplicateColumnError(err error) bool {
+	return strings.Contains(err.Error(), "duplicate column name")
+}
 
 // ApplyMigrations applies multiple SQL files in order and records them in Migrations table
 func runMigrations(db *sql.DB, migrationFiles []string) error {
@@ -52,7 +58,13 @@ func runMigrations(db *sql.DB, migrationFiles []string) error {
 		// Execute migration SQL (migration files manage their own transactions)
 		_, err = db.Exec(string(sqlBytes))
 		if err != nil {
-			return fmt.Errorf("failed to execute migration %s: %w", file, err)
+			// Check if it's a "duplicate column" error (safe to ignore)
+			if isDuplicateColumnError(err) {
+				fmt.Printf("%s⊘ Migration already applied (column exists):%s %s\n", migrationColors.Yellow, migrationColors.Reset, migrationColors.CodexPink+file+migrationColors.Reset)
+				// Still record it as applied
+			} else {
+				return fmt.Errorf("failed to execute migration %s: %w", file, err)
+			}
 		}
 
 		// Record migration in separate transaction

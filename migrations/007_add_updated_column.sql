@@ -2,15 +2,11 @@
 -- This handles databases created before the Updated column was added to schema
 -- Context: Some WSL environments may have old databases without this column
 
-BEGIN TRANSACTION;
+-- The migration runner handles "duplicate column name" errors gracefully
+-- If the column already exists, this migration is skipped and marked as applied
 
--- SQLite doesn't support "ADD COLUMN IF NOT EXISTS"
--- This will succeed if column is missing, fail if it exists
--- The migration runner should handle the duplicate column error gracefully
+BEGIN TRANSACTION;
 
 ALTER TABLE Users ADD COLUMN Updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 COMMIT;
-
--- Note: If you see "duplicate column name: Updated" error, this is expected
--- and means your database already has the column (no action needed)
